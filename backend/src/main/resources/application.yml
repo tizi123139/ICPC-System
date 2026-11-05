@@ -1,0 +1,66 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: icpc-system
+  profiles:
+    active: dev
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 3s
+      lettuce:
+        pool:
+          max-active: 16
+          max-idle: 8
+          min-idle: 0
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    banner: false
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+
+app:
+  jwt:
+    # 生产环境务必通过环境变量 APP_JWT_SECRET 覆盖，长度不少于 32 字符
+    secret: ${APP_JWT_SECRET:icpc-system-dev-secret-key-please-change-in-production}
+    expiration-seconds: 7200
+  upload:
+    directory: ./uploads
+    url-prefix: /uploads
+    max-size: 10485760
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173
+  init-data: true
+
+logging:
+  level:
+    com.scuec.icpc: debug
+    org.springframework.security: warn

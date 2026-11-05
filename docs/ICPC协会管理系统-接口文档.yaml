@@ -1,0 +1,2476 @@
+openapi: "3.0.3"
+info:
+  title: ICPC 协会管理系统 API
+  version: "1.0.0"
+  description: |
+    中南民族大学 ICPC 协会管理系统后端接口规范。
+
+    **技术栈**：Spring Boot 3.2+ / MySQL 8.0 / Redis 7.x
+    **鉴权方式**：JWT Bearer Token（登录后返回，后续请求放入 `Authorization` 头）
+    **基础路径**：`/api/v1`
+
+    ## 角色速查表
+    | 编号 | 角色编码 | 角色名称 |
+    |------|---------|---------|
+    | R01 | OBSERVE_MEMBER | 观察会员 |
+    | R02 | MEMBER | 正式会员 |
+    | R03 | LAB_MEMBER | 竞赛实验室成员 |
+    | R04 | TEAM_LEADER | 队长 |
+    | R05 | OFFICER | 干事 |
+    | R06 | ASSISTANT_COACH | 助理教练 |
+    | R07 | MINISTER | 部长/副部长 |
+    | R08 | PRESIDENT | 会长/副会长 |
+    | R09 | ADVISOR | 指导老师 |
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: 本地开发环境
+  - url: https://icpc.scuec.edu.cn/api/v1
+    description: 生产环境（示例）
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Success:
+      description: 通用成功响应
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 0
+            message: "ok"
+            data: {}
+    BadRequest:
+      description: 参数校验失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 400
+            message: "参数校验失败：xxx 字段不能为空"
+            data: null
+    Unauthorized:
+      description: 未登录 / Token 过期
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 401
+            message: "未授权，请先登录"
+            data: null
+    Forbidden:
+      description: 无权限访问
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 403
+            message: "无权执行此操作"
+            data: null
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 404
+            message: "资源不存在"
+            data: null
+
+  schemas:
+    ApiResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 状态码，0 表示成功，非 0 表示失败
+        message:
+          type: string
+          description: 提示信息
+        data:
+          nullable: true
+          description: 业务数据（成功时返回）
+
+    PageResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: 总记录数
+            page:
+              type: integer
+              description: 当前页码（从 1 开始）
+            size:
+              type: integer
+              description: 每页条数
+            records:
+              type: array
+              description: 当前页数据列表
+
+    LoginRequest:
+      type: object
+      required: [studentId, password]
+      properties:
+        studentId:
+          type: string
+          description: 学号
+          example: "2023210100"
+        password:
+          type: string
+          description: 密码
+          example: "******"
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT Token
+        expiresIn:
+          type: integer
+          description: 过期时间（秒）
+        user:
+          $ref: '#/components/schemas/UserInfo'
+
+    UserInfo:
+      type: object
+      properties:
+        userId:
+          type: integer
+        studentId:
+          type: string
+        name:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+            description: 角色编码
+        avatar:
+          type: string
+          nullable: true
+
+    MemberInfo:
+      type: object
+      properties:
+        memberId:
+          type: integer
+        name:
+          type: string
+        studentId:
+          type: string
+        major:
+          type: string
+        grade:
+          type: string
+          description: 年级，如 "2023级"
+        phone:
+          type: string
+        email:
+          type: string
+        memberType:
+          type: string
+          enum: [OBSERVE_MEMBER, MEMBER, LAB_MEMBER]
+        department:
+          type: string
+          nullable: true
+        joinDate:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE, RESIGNED, REMOVED]
+        createTime:
+          type: string
+          format: date-time
+
+    ProblemInfo:
+      type: object
+      properties:
+        problemId:
+          type: integer
+        title:
+          type: string
+        ojProblemId:
+          type: string
+          description: 对应自建 OJ 的题目编号
+        difficulty:
+          type: string
+          enum: [EASY, MEDIUM, HARD]
+        timeLimit:
+          type: integer
+          description: 时间限制（毫秒）
+        memoryLimit:
+          type: integer
+          description: 内存限制（KB）
+        description:
+          type: string
+          description: 题目描述（Markdown）
+        inputFormat:
+          type: string
+        outputFormat:
+          type: string
+        sampleInput:
+          type: string
+        sampleOutput:
+          type: string
+        hint:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tag'
+        solution:
+          $ref: '#/components/schemas/Solution'
+        visibility:
+          type: string
+          enum: [PUBLIC, TRAINING_PRIVATE]
+
+    Tag:
+      type: object
+      properties:
+        tagId:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+          description: 知识点分类，如 "DP"、"图论"、"数论"
+
+    Solution:
+      type: object
+      properties:
+        solutionId:
+          type: integer
+        content:
+          type: string
+          description: 题解内容（Markdown）
+        referenceCode:
+          type: string
+          nullable: true
+        updateTime:
+          type: string
+          format: date-time
+
+    TrainingInfo:
+      type: object
+      properties:
+        trainingId:
+          type: integer
+        name:
+          type: string
+        type:
+          type: string
+          enum: [SOLO, TEAM]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        leaderboardVisible:
+          type: boolean
+        freezeTime:
+          type: integer
+          description: 封榜开始时间（训练结束前 N 分钟），0 表示不封榜
+        problemIds:
+          type: array
+          items:
+            type: integer
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, ONGOING, ENDED]
+        creator:
+          $ref: '#/components/schemas/UserInfo'
+        createTime:
+          type: string
+          format: date-time
+
+    SubmitRecord:
+      type: object
+      properties:
+        submitId:
+          type: integer
+        trainingId:
+          type: integer
+        problemId:
+          type: integer
+        submitter:
+          $ref: '#/components/schemas/UserInfo'
+        code:
+          type: string
+          description: 提交的源代码（列表接口不返回）
+        language:
+          type: string
+          description: 编程语言，如 "C++17"、"Java 17"
+        result:
+          type: string
+          enum: [PENDING, JUDGING, AC, WA, TLE, MLE, RE, CE]
+        timeUsed:
+          type: integer
+          description: 耗时（毫秒）
+        memoryUsed:
+          type: integer
+          description: 内存（KB）
+        submitTime:
+          type: string
+          format: date-time
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: integer
+        userId:
+          type: integer
+        userName:
+          type: string
+        teamId:
+          type: integer
+          nullable: true
+        teamName:
+          type: string
+          nullable: true
+        solvedCount:
+          type: integer
+        penalty:
+          type: integer
+          description: 罚时（分钟）
+
+    TeamInfo:
+      type: object
+      properties:
+        teamId:
+          type: integer
+        name:
+          type: string
+        leaderId:
+          type: integer
+        memberIds:
+          type: array
+          items:
+            type: integer
+        contestTarget:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [DRAFT, PENDING_CONFIRM, CONFIRMED, DISSOLVED]
+        createTime:
+          type: string
+          format: date-time
+
+    ContestInfo:
+      type: object
+      properties:
+        contestId:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+          enum: [SCHOLASTIC, XCPC, NON_XCPC]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        description:
+          type: string
+        registrationDeadline:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [ANNOUNCED, REGISTERING, ONGOING, ENDED]
+
+    CheckInRecord:
+      type: object
+      properties:
+        recordId:
+          type: integer
+        campId:
+          type: integer
+          description: 集训 ID（寒假/暑假集训共用签到模块）
+        userId:
+          type: integer
+        checkInDate:
+          type: string
+          format: date
+        checkInTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [PRESENT, ABSENT, LEAVE, MAKEUP]
+
+    ApplyRecord:
+      type: object
+      properties:
+        applyId:
+          type: integer
+        type:
+          type: string
+          description: 申请类型，如 JOIN_MEMBER、RESIGN、CAMP_REGISTER、CONTEST_REGISTER
+        applicantId:
+          type: integer
+        applyData:
+          type: object
+          description: 申请详情（JSON，不同类型结构不同）
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+        auditRemark:
+          type: string
+          nullable: true
+        auditorId:
+          type: integer
+          nullable: true
+        applyTime:
+          type: string
+          format: date-time
+        auditTime:
+          type: string
+          format: date-time
+          nullable: true
+
+    MbtiResult:
+      type: object
+      properties:
+        resultId:
+          type: integer
+        userId:
+          type: integer
+        type:
+          type: string
+          description: MBTI 类型，如 "INTJ"、"ENFP"
+        scores:
+          type: object
+          description: 各维度得分
+          properties:
+            E_I: { type: number }
+            S_N: { type: number }
+            T_F: { type: number }
+            J_P: { type: number }
+        reportUrl:
+          type: string
+          nullable: true
+        testTime:
+          type: string
+          format: date-time
+
+paths:
+  # ==================== 认证模块 ====================
+  /auth/login:
+    post:
+      summary: 用户登录
+      tags: [auth, 认证模块]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: 账号或密码错误
+
+  /auth/logout:
+    post:
+      summary: 用户登出
+      tags: [auth, 认证模块]
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /auth/profile:
+    get:
+      summary: 获取当前登录用户信息
+      tags: [auth, 认证模块]
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/UserInfo'
+
+  # ==================== 会员管理 ====================
+  /members:
+    get:
+      summary: 分页查询会员列表
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: keyword
+          in: query
+          description: 姓名/学号模糊搜索
+          schema: { type: string }
+        - name: memberType
+          in: query
+          schema:
+            type: string
+            enum: [OBSERVE_MEMBER, MEMBER, LAB_MEMBER]
+        - name: grade
+          in: query
+          schema: { type: string }
+        - name: department
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, INACTIVE, RESIGNED, REMOVED]
+      responses:
+        '200':
+          description: 分页会员列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/MemberInfo'
+
+    post:
+      summary: 新增会员（管理员）
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, name, major, memberType]
+              properties:
+                studentId: { type: string }
+                name: { type: string }
+                major: { type: string }
+                grade: { type: string }
+                phone: { type: string }
+                email: { type: string }
+                memberType:
+                  type: string
+                  enum: [OBSERVE_MEMBER, MEMBER, LAB_MEMBER]
+                department: { type: string }
+                joinDate: { type: string, format: date }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /members/{memberId}:
+    get:
+      summary: 获取会员详情
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 会员详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MemberInfo'
+
+    put:
+      summary: 更新会员信息
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                major: { type: string }
+                grade: { type: string }
+                phone: { type: string }
+                email: { type: string }
+                memberType:
+                  type: string
+                  enum: [OBSERVE_MEMBER, MEMBER, LAB_MEMBER]
+                department: { type: string }
+                status:
+                  type: string
+                  enum: [ACTIVE, INACTIVE, RESIGNED, REMOVED]
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+    delete:
+      summary: 删除会员（逻辑删除）
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /members/{memberId}/archive:
+    get:
+      summary: 获取会员完整档案（含训练记录、竞赛成绩、奖惩）
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 会员完整档案
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          basicInfo:
+                            $ref: '#/components/schemas/MemberInfo'
+                          trainingRecords:
+                            type: array
+                            items: { type: object }
+                          contestRecords:
+                            type: array
+                            items: { type: object }
+                          rewards:
+                            type: array
+                            items: { type: object }
+                          punishments:
+                            type: array
+                            items: { type: object }
+
+  /members/apply/join:
+    post:
+      summary: 提交入会申请
+      tags: [members, 会员管理]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [studentId, name, major, grade, reason]
+              properties:
+                studentId: { type: string }
+                name: { type: string }
+                major: { type: string }
+                grade: { type: string }
+                phone: { type: string }
+                reason: { type: string, description: 入会动机 }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /members/apply/resign:
+    post:
+      summary: 提交退会申请
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /members/approvals:
+    get:
+      summary: 查询待审批申请列表（入会/退会）
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [JOIN_MEMBER, RESIGN, REMOVE]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED]
+      responses:
+        '200':
+          description: 申请列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ApplyRecord'
+
+  /members/approvals/{applyId}/audit:
+    post:
+      summary: 审批申请（通过或驳回）
+      tags: [members, 会员管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: applyId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [APPROVE, REJECT]
+                remark: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  # ==================== 知识点管理 ====================
+  /tags:
+    get:
+      summary: 获取知识点树
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          description: 知识点层级列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            tagId: { type: integer }
+                            name: { type: string }
+                            category: { type: string }
+                            children:
+                              type: array
+                              items: { type: object }
+
+    post:
+      summary: 新增知识点
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, category]
+              properties:
+                name: { type: string }
+                category: { type: string }
+                parentId: { type: integer, nullable: true }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /tags/{tagId}:
+    put:
+      summary: 修改知识点
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: tagId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                category: { type: string }
+                parentId: { type: integer, nullable: true }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+    delete:
+      summary: 删除知识点
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: tagId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  # ==================== 题目管理 ====================
+  /problems:
+    get:
+      summary: 分页查询题目列表
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: keyword
+          in: query
+          description: 题目标题搜索
+          schema: { type: string }
+        - name: tagId
+          in: query
+          description: 按知识点筛选
+          schema: { type: integer }
+        - name: difficulty
+          in: query
+          schema:
+            type: string
+            enum: [EASY, MEDIUM, HARD]
+        - name: visibility
+          in: query
+          schema:
+            type: string
+            enum: [PUBLIC, TRAINING_PRIVATE]
+      responses:
+        '200':
+          description: 题目分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ProblemInfo'
+
+    post:
+      summary: 新增题目
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, difficulty, timeLimit, memoryLimit, description, inputFormat, outputFormat, sampleInput, sampleOutput]
+              properties:
+                title: { type: string }
+                ojProblemId: { type: string }
+                difficulty:
+                  type: string
+                  enum: [EASY, MEDIUM, HARD]
+                timeLimit: { type: integer }
+                memoryLimit: { type: integer }
+                description: { type: string, description: "Markdown 格式" }
+                inputFormat: { type: string }
+                outputFormat: { type: string }
+                sampleInput: { type: string }
+                sampleOutput: { type: string }
+                hint: { type: string }
+                tagIds:
+                  type: array
+                  items: { type: integer }
+                visibility:
+                  type: string
+                  enum: [PUBLIC, TRAINING_PRIVATE]
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /problems/{problemId}:
+    get:
+      summary: 获取题目详情
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: problemId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 题目详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ProblemInfo'
+
+    put:
+      summary: 修改题目
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: problemId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                difficulty:
+                  type: string
+                  enum: [EASY, MEDIUM, HARD]
+                timeLimit: { type: integer }
+                memoryLimit: { type: integer }
+                description: { type: string }
+                inputFormat: { type: string }
+                outputFormat: { type: string }
+                sampleInput: { type: string }
+                sampleOutput: { type: string }
+                hint: { type: string }
+                tagIds:
+                  type: array
+                  items: { type: integer }
+                visibility:
+                  type: string
+                  enum: [PUBLIC, TRAINING_PRIVATE]
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+    delete:
+      summary: 删除题目
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: problemId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /problems/{problemId}/solution:
+    put:
+      summary: 更新题解
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: problemId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string, description: "题解 Markdown" }
+                referenceCode: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /problems/import:
+    post:
+      summary: 从 OJ 批量导入题目
+      tags: [problems, 题库管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ojProblemIds]
+              properties:
+                ojProblemIds:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: 导入结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          successCount: { type: integer }
+                          failedCount: { type: integer }
+
+  # ==================== 训练管理 ====================
+  /trainings:
+    get:
+      summary: 分页查询训练列表
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [SOLO, TEAM]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PUBLISHED, ONGOING, ENDED]
+      responses:
+        '200':
+          description: 训练分页列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/TrainingInfo'
+
+    post:
+      summary: 创建训练
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, startTime, endTime, problemIds]
+              properties:
+                name: { type: string }
+                type:
+                  type: string
+                  enum: [SOLO, TEAM]
+                startTime: { type: string, format: date-time }
+                endTime: { type: string, format: date-time }
+                problemIds:
+                  type: array
+                  items: { type: integer }
+                leaderboardVisible: { type: boolean, default: true }
+                freezeTime:
+                  type: integer
+                  description: 封榜时间（结束前 N 分钟，0 表示不封榜）
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /trainings/{trainingId}:
+    get:
+      summary: 获取训练详情
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: trainingId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 训练详情（含题目列表）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          basicInfo:
+                            $ref: '#/components/schemas/TrainingInfo'
+                          problems:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ProblemInfo'
+
+    put:
+      summary: 修改训练（仅 DRAFT 状态可改）
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: trainingId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                startTime: { type: string, format: date-time }
+                endTime: { type: string, format: date-time }
+                problemIds:
+                  type: array
+                  items: { type: integer }
+                leaderboardVisible: { type: boolean }
+                freezeTime: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+    delete:
+      summary: 删除训练
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: trainingId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /trainings/{trainingId}/publish:
+    post:
+      summary: 发布训练
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: trainingId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /trainings/{trainingId}/submissions:
+    get:
+      summary: 查询训练提交记录
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: trainingId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: userId
+          in: query
+          description: 仅教练/管理员可指定，普通会员默认查自己
+          schema: { type: integer }
+        - name: problemId
+          in: query
+          schema: { type: integer }
+        - name: result
+          in: query
+          schema:
+            type: string
+            enum: [AC, WA, TLE, MLE, RE, CE]
+      responses:
+        '200':
+          description: 提交记录列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SubmitRecord'
+
+  /trainings/{trainingId}/submit:
+    post:
+      summary: 提交代码（训练中）
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: trainingId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [problemId, code, language]
+              properties:
+                problemId: { type: integer }
+                code: { type: string }
+                language:
+                  type: string
+                  description: "C++17 / Java 17 / Python 3.11 / Go 1.21 / ..."
+      responses:
+        '200':
+          description: 提交成功，返回判题结果（异步）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          submitId: { type: integer }
+                          result: { type: string, description: "PENDING / AC / WA / ..." }
+
+  /trainings/{trainingId}/leaderboard:
+    get:
+      summary: 获取训练实时榜单
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: trainingId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 榜单
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          frozen:
+                            type: boolean
+                            description: 榜单是否已封榜
+                          entries:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/LeaderboardEntry'
+
+  /trainings/ability/{userId}:
+    get:
+      summary: 获取个人能力评估（雷达图数据）
+      tags: [trainings, 训练管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 能力评估
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          tagScores:
+                            type: array
+                            description: 各知识点掌握度（0-100）
+                            items:
+                              type: object
+                              properties:
+                                tagName: { type: string }
+                                score: { type: number }
+                          recentTrend:
+                            type: array
+                            items: { type: object }
+                          report: { type: string, description: "文字版能力分析" }
+
+  # ==================== 组队管理 ====================
+  /teams:
+    get:
+      summary: 分页查询队伍列表
+      tags: [teams, 组队管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PENDING_CONFIRM, CONFIRMED, DISSOLVED]
+        - name: contestId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 队伍列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/TeamInfo'
+
+    post:
+      summary: 创建队伍（发起组队申请）
+      tags: [teams, 组队管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, contestTarget]
+              properties:
+                name: { type: string }
+                contestTarget: { type: string }
+                invitedMemberIds:
+                  type: array
+                  items: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /teams/{teamId}:
+    get:
+      summary: 获取队伍详情
+      tags: [teams, 组队管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 队伍详情 + 成员信息 + 能力画像
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          basicInfo:
+                            $ref: '#/components/schemas/TeamInfo'
+                          members:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/MemberInfo'
+                          abilitySummary: { type: object }
+
+    put:
+      summary: 更新队伍信息
+      tags: [teams, 组队管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                leaderId: { type: integer }
+                contestTarget: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /teams/{teamId}/members:
+    post:
+      summary: 邀请成员加入队伍
+      tags: [teams, 组队管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [memberId]
+              properties:
+                memberId: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+    delete:
+      summary: 移除成员 / 成员离队
+      tags: [teams, 组队管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: memberId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /teams/{teamId}/confirm:
+    post:
+      summary: 教练确认队伍（审核通过）
+      tags: [teams, 组队管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: teamId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  # ==================== 集训管理（寒假/暑假共用） ====================
+  /camps:
+    get:
+      summary: 查询集训列表（寒假/暑假）
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [WINTER, SUMMER]
+        - name: year
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 集训列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            campId: { type: integer }
+                            name: { type: string }
+                            type: { type: string }
+                            startTime: { type: string, format: date-time }
+                            endTime: { type: string, format: date-time }
+                            location: { type: string }
+                            registrationDeadline: { type: string, format: date-time }
+                            status:
+                              type: string
+                              enum: [ANNOUNCED, REGISTERING, ONGOING, ENDED]
+
+    post:
+      summary: 发布集训通知（教练/管理员）
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, type, startTime, endTime, registrationDeadline, description]
+              properties:
+                name: { type: string }
+                type:
+                  type: string
+                  enum: [WINTER, SUMMER]
+                startTime: { type: string, format: date-time }
+                endTime: { type: string, format: date-time }
+                location: { type: string }
+                registrationDeadline: { type: string, format: date-time }
+                description: { type: string }
+                requirements: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /camps/{campId}:
+    get:
+      summary: 获取集训详情
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: campId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 集训详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          basicInfo: { type: object }
+                          tasks:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                taskId: { type: integer }
+                                title: { type: string }
+                                date: { type: string, format: date }
+                                content: { type: string }
+                                attachments: { type: array }
+
+  /camps/{campId}/register:
+    post:
+      summary: 提交集训报名
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: campId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
+                availableDates:
+                  type: array
+                  items: { type: string, format: date }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /camps/{campId}/registrations:
+    get:
+      summary: 查询集训报名列表 + 审核
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: campId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED]
+      responses:
+        '200':
+          description: 报名列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ApplyRecord'
+
+  /camps/{campId}/registrations/{applyId}/audit:
+    post:
+      summary: 审核集训报名
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: campId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: applyId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [APPROVE, REJECT]
+                remark: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /camps/{campId}/tasks:
+    post:
+      summary: 发布集训任务
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: campId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, date, content]
+              properties:
+                title: { type: string }
+                date: { type: string, format: date }
+                content: { type: string }
+                problemIds:
+                  type: array
+                  items: { type: integer }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /camps/{campId}/checkin:
+    post:
+      summary: 集训签到打卡
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: campId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date]
+              properties:
+                date: { type: string, format: date }
+                remark: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /camps/{campId}/attendance:
+    get:
+      summary: 查询集训考勤记录
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: campId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: date
+          in: query
+          schema: { type: string, format: date }
+        - name: userId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 考勤记录列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CheckInRecord'
+
+  /camps/{campId}/attendance/{recordId}:
+    put:
+      summary: 修改考勤状态（补签/请假）
+      tags: [camps, 集训管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: campId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: recordId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [PRESENT, ABSENT, LEAVE, MAKEUP]
+                remark: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  # ==================== 赛事管理（校赛 / XCPC / 非 XCPC 共用基础） ====================
+  /contests:
+    get:
+      summary: 查询赛事列表
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [SCHOLASTIC, XCPC, NON_XCPC]
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        '200':
+          description: 赛事列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/PageResponse'
+                          - type: object
+                            properties:
+                              records:
+                                type: array
+                                items:
+                                  $ref: '#/components/schemas/ContestInfo'
+
+    post:
+      summary: 创建/发布赛事
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, category, startTime, endTime, registrationDeadline]
+              properties:
+                name: { type: string }
+                category:
+                  type: string
+                  enum: [SCHOLASTIC, XCPC, NON_XCPC]
+                startTime: { type: string, format: date-time }
+                endTime: { type: string, format: date-time }
+                registrationDeadline: { type: string, format: date-time }
+                description: { type: string }
+                requirements: { type: string }
+                maxTeamSize: { type: integer, default: 3 }
+                problemIds:
+                  type: array
+                  items: { type: integer }
+                freezeMinutes: { type: integer, default: 60, description: "封榜时间（结束前 N 分钟）" }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /contests/{contestId}:
+    get:
+      summary: 获取赛事详情
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 赛事详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ContestInfo'
+
+  /contests/{contestId}/registrations:
+    get:
+      summary: 查询赛事报名列表
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, APPROVED, REJECTED]
+      responses:
+        '200':
+          description: 报名列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ApplyRecord'
+
+  /contests/{contestId}/register:
+    post:
+      summary: 队伍/个人报名赛事
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                teamId: { type: integer, description: "组队赛传 teamId，个人赛不传" }
+                materials:
+                  type: array
+                  description: "报名材料 URL 列表（非 XCPC 赛事可选）"
+                  items: { type: string }
+                remark: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /contests/{contestId}/registrations/{applyId}/audit:
+    post:
+      summary: 审核赛事报名
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: applyId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [APPROVE, REJECT]
+                remark: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  /contests/{contestId}/leaderboard:
+    get:
+      summary: 获取赛事实时榜单
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 榜单
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          frozen: { type: boolean }
+                          entries:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/LeaderboardEntry'
+
+  /contests/{contestId}/submit:
+    post:
+      summary: 比赛中提交代码
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [problemId, code, language]
+              properties:
+                problemId: { type: integer }
+                code: { type: string }
+                language: { type: string }
+      responses:
+        '200':
+          description: 提交结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          submitId: { type: integer }
+                          result: { type: string }
+
+  /contests/{contestId}/certificates:
+    post:
+      summary: 批量生成获奖电子证书
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                templateId: { type: integer }
+                awardRules:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      awardName: { type: string }
+                      rankRange: { type: string, description: "如 '1-3'" }
+      responses:
+        '200':
+          description: 证书生成结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          generatedCount: { type: integer }
+                          downloadUrl: { type: string }
+
+  /contests/{contestId}/results:
+    put:
+      summary: 登记赛事获奖/成绩（赛后归档）
+      tags: [contests, 赛事管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [results]
+              properties:
+                results:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      teamId: { type: integer }
+                      rank: { type: integer }
+                      award: { type: string, description: "如 '金奖'、'银奖'、'铜奖'、'优秀'" }
+                      score: { type: number }
+      responses:
+        '200':
+          $ref: '#/components/responses/Success'
+
+  # ==================== MBTI 管理（低优先级） ====================
+  /mbti/questions:
+    get:
+      summary: 获取 MBTI 测评题目列表
+      tags: [mbti, MBTI 管理]
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          description: MBTI 题目
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            questionId: { type: integer }
+                            content: { type: string }
+                            options:
+                              type: array
+                              items:
+                                type: object
+                                properties:
+                                  option: { type: string }
+                                  dimension: { type: string, description: "E/I/S/N/T/F/J/P" }
+                                  value: { type: integer }
+
+  /mbti/submit:
+    post:
+      summary: 提交 MBTI 测评答案
+      tags: [mbti, MBTI 管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answers]
+              properties:
+                answers:
+                  type: array
+                  items:
+                    type: object
+                    required: [questionId, option]
+                    properties:
+                      questionId: { type: integer }
+                      option: { type: string }
+      responses:
+        '200':
+          description: 测评结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MbtiResult'
+
+  /mbti/results/{userId}:
+    get:
+      summary: 查看某会员 MBTI 测评结果
+      tags: [mbti, MBTI 管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 历史测评结果（取最新一次）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/MbtiResult'
+
+  # ==================== 个性化推荐（低优先级） ====================
+  /recommendations/problems:
+    get:
+      summary: 基于薄弱知识点推荐习题
+      tags: [recommend, 个性化推荐]
+      security: [bearerAuth: []]
+      parameters:
+        - name: userId
+          in: query
+          description: 默认当前用户，教练可指定
+          schema: { type: integer }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 10 }
+      responses:
+        '200':
+          description: 推荐题目列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProblemInfo'
+
+  /recommendations/trainings:
+    get:
+      summary: 基于能力评估推荐专项训练
+      tags: [recommend, 个性化推荐]
+      security: [bearerAuth: []]
+      parameters:
+        - name: userId
+          in: query
+          schema: { type: integer }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 5 }
+      responses:
+        '200':
+          description: 推荐训练列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TrainingInfo'
+
+  # ==================== 数据统计与导出 ====================
+  /statistics/members/overview:
+    get:
+      summary: 会员结构统计（按年级/专业/部门/类型）
+      tags: [statistics, 数据统计]
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          description: 会员结构统计
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          byGrade: { type: array, items: { type: object } }
+                          byMajor: { type: array, items: { type: object } }
+                          byDepartment: { type: array, items: { type: object } }
+                          byMemberType: { type: array, items: { type: object } }
+
+  /statistics/training/summary:
+    get:
+      summary: 训练数据汇总（教练/管理员）
+      tags: [statistics, 数据统计]
+      security: [bearerAuth: []]
+      parameters:
+        - name: startDate
+          in: query
+          schema: { type: string, format: date }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: 训练数据汇总
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          totalTrainings: { type: integer }
+                          totalSubmissions: { type: integer }
+                          avgAcRate: { type: number }
+                          topMembers: { type: array }
+
+  /export/training-report/{trainingId}:
+    get:
+      summary: 导出训练成绩报表（Excel）
+      tags: [export, 数据导出]
+      security: [bearerAuth: []]
+      parameters:
+        - name: trainingId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Excel 文件流
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  /export/contest-certificates/{contestId}:
+    get:
+      summary: 下载赛事获奖证书打包（ZIP）
+      tags: [export, 数据导出]
+      security: [bearerAuth: []]
+      parameters:
+        - name: contestId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: ZIP 文件流
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+
+  # ==================== 文件上传 ====================
+  /files/upload:
+    post:
+      summary: 通用文件上传（题解附件、证书等）
+      tags: [files, 文件服务]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: 上传成功，返回文件 URL
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          url: { type: string }
+                          filename: { type: string }
+                          size: { type: integer }
