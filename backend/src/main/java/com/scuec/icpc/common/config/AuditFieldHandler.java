@@ -19,6 +19,9 @@ public class AuditFieldHandler implements MetaObjectHandler {
 
     @Override
     public void updateFill(MetaObject metaObject) {
-        strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, LocalDateTime.now());
+        // strictUpdateFill 仅在字段为 null 时生效；更新场景必须强制覆盖。
+        if (metaObject.hasSetter("updateTime")) {
+            metaObject.setValue("updateTime", LocalDateTime.now());
+        }
     }
 }

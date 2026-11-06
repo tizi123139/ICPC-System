@@ -205,17 +205,20 @@ CREATE TABLE IF NOT EXISTS camp (
     camp_id               BIGINT       NOT NULL AUTO_INCREMENT,
     type                  VARCHAR(20)  NOT NULL COMMENT 'WINTER/SUMMER',
     name                  VARCHAR(255) NOT NULL,
-    start_date            DATE         NULL,
-    end_date              DATE         NULL,
-    registration_deadline DATETIME     NULL,
+    start_time            DATETIME     NOT NULL COMMENT '集训开始时间',
+    end_time              DATETIME     NOT NULL COMMENT '集训结束时间',
+    location              VARCHAR(255) NULL COMMENT '集训地点',
+    registration_deadline DATETIME     NULL COMMENT '报名截止时间',
     description           TEXT         NULL,
+    requirements          TEXT         NULL COMMENT '报名要求',
     status                VARCHAR(20)  NOT NULL DEFAULT 'ANNOUNCED',
     creator_id            BIGINT       NULL,
     create_time           DATETIME     NULL,
     update_time           DATETIME     NULL,
     deleted               TINYINT      NOT NULL DEFAULT 0,
     PRIMARY KEY (camp_id),
-    KEY idx_camp_type (type)
+    KEY idx_camp_type (type),
+    KEY idx_camp_start_time (start_time)
 ) ENGINE = InnoDB COMMENT = '集训';
 
 CREATE TABLE IF NOT EXISTS camp_registration (
@@ -249,6 +252,16 @@ CREATE TABLE IF NOT EXISTS camp_task (
     PRIMARY KEY (task_id),
     KEY idx_camp_task_camp (camp_id)
 ) ENGINE = InnoDB COMMENT = '集训每日任务';
+
+CREATE TABLE IF NOT EXISTS camp_task_problem (
+    id         BIGINT NOT NULL AUTO_INCREMENT,
+    task_id    BIGINT NOT NULL,
+    problem_id BIGINT NOT NULL,
+    sort_order INT    NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_camp_task_problem (task_id, problem_id),
+    KEY idx_camp_task_problem_task (task_id)
+) ENGINE = InnoDB COMMENT = '集训任务-题目关联';
 
 CREATE TABLE IF NOT EXISTS attendance (
     record_id     BIGINT      NOT NULL AUTO_INCREMENT,
