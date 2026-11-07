@@ -16,13 +16,13 @@ public interface CampQueryMapper {
 
     @Select("""
             <script>
-            SELECT ctp.task_id     AS taskId,
-                   ctp.problem_id  AS problemId,
-                   p.title         AS title,
-                   ctp.sort_order  AS sortOrder
-            FROM camp_task_problem ctp
+            SELECT ctp.target_id    AS taskId,
+                   ctp.problem_id   AS problemId,
+                   p.title          AS title,
+                   ctp.sort_order   AS sortOrder
+            FROM problem_link ctp
             JOIN problem p ON p.problem_id = ctp.problem_id AND p.deleted = 0
-            WHERE ctp.task_id IN
+            WHERE ctp.target_type = 'CAMP_TASK' AND ctp.target_id IN
             <foreach collection="taskIds" item="id" open="(" separator="," close=")">#{id}</foreach>
             ORDER BY ctp.sort_order, ctp.id
             </script>

@@ -16,13 +16,13 @@ public interface ContestQueryMapper {
 
     @Select("""
             <script>
-            SELECT cp.contest_id AS contestId,
+            SELECT cp.target_id  AS contestId,
                    cp.problem_id AS problemId,
                    p.title       AS title,
                    cp.sort_order AS sortOrder
-            FROM contest_problem cp
+            FROM problem_link cp
             JOIN problem p ON p.problem_id = cp.problem_id AND p.deleted = 0
-            WHERE cp.contest_id IN
+            WHERE cp.target_type = 'CONTEST' AND cp.target_id IN
             <foreach collection="contestIds" item="id" open="(" separator="," close=")">#{id}</foreach>
             ORDER BY cp.sort_order, cp.id
             </script>

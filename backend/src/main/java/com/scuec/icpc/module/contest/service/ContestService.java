@@ -10,15 +10,15 @@ import com.scuec.icpc.common.exception.BusinessException;
 import com.scuec.icpc.common.security.SecurityUtils;
 import com.scuec.icpc.module.contest.dto.ContestDtos;
 import com.scuec.icpc.module.contest.dto.ContestRows;
+import com.scuec.icpc.module.application.entity.Application;
+import com.scuec.icpc.module.application.mapper.ApplicationMapper;
 import com.scuec.icpc.module.contest.entity.Contest;
-import com.scuec.icpc.module.contest.entity.ContestProblem;
-import com.scuec.icpc.module.contest.entity.ContestRegistration;
 import com.scuec.icpc.module.contest.entity.ContestResult;
 import com.scuec.icpc.module.contest.mapper.ContestMapper;
-import com.scuec.icpc.module.contest.mapper.ContestProblemMapper;
 import com.scuec.icpc.module.contest.mapper.ContestQueryMapper;
-import com.scuec.icpc.module.contest.mapper.ContestRegistrationMapper;
 import com.scuec.icpc.module.contest.mapper.ContestResultMapper;
+import com.scuec.icpc.module.problem.entity.ProblemLink;
+import com.scuec.icpc.module.problem.mapper.ProblemLinkMapper;
 import com.scuec.icpc.module.member.entity.Member;
 import com.scuec.icpc.module.member.mapper.MemberMapper;
 import com.scuec.icpc.module.training.entity.Submission;
@@ -57,8 +57,8 @@ public class ContestService {
     private static final Set<String> WRONG_RESULTS = Set.of("WA", "TLE", "MLE", "RE", "CE");
 
     private final ContestMapper contestMapper;
-    private final ContestRegistrationMapper registrationMapper;
-    private final ContestProblemMapper contestProblemMapper;
+    private final ApplicationMapper applicationMapper;
+    private final ProblemLinkMapper problemLinkMapper;
     private final ContestResultMapper resultMapper;
     private final ContestQueryMapper queryMapper;
     private final SubmissionMapper submissionMapper;
@@ -164,23 +164,25 @@ public class ContestService {
             if (queryMapper.countTeamMembers(team.getTeamId()) > contest.getMaxTeamSize()) {
                 throw BusinessException.conflict("队伍人数超过赛事上限");
             }
-            Long duplicated = registrationMapper.selectCount(
-                    Wrappers.<ContestRegistration>lambdaQuery()
-                            .eq(ContestRegistration::getContestId, contestId)
-                            .eq(ContestRegistration::getTeamId, team.getTeamId())
-                            .in(ContestRegistration::getStatus,
+            Long duplicated = applicationMapper.selectCount(
+                    Wrappers.<Application>lambdaQuery()
+                            .eq(Application::getType, Enums.ApplyType.CONTEST_REGISTER.name())
+                            .eq(Application::getTargetId, contestId)
+                            .eq(Application::getTeamId, team.getTeamId())
+                            .in(Application::getStatus,
                                     Enums.ApplyStatus.PENDING.name(),
                                     Enums.ApplyStatus.APPROVED.name()));
             if (duplicated != null && duplicated > 0) {
                 throw BusinessException.conflict("该队伍已报名本赛事，请勿重复提交");
             }
         } else {
-            Long duplicated = registrationMapper.selectCount(
-                    Wrappers.<ContestRegistration>lambdaQuery()
-                            .eq(ContestRegistration::getContestId, contestId)
-                            .eq(ContestRegistration::getMemberId, memberId)
-                            .isNull(ContestRegistration::getTeamId)
-                            .in(ContestRegistration::getStatus,
+            Long duplicated = applicationMapper.selectCount(
+                    Wrappers.<Application>lambdaQuery()
+                            .eq(Application::getType, Enums.ApplyType.CONTEST_REGISTER.name())
+                            .eq(Application::getTargetId, contestId)
+                            .eq(Application::getApplicantId, memberId)
+                            .isNull(Application::getTeamId)
+                            .in(Application::getStatus,
                                     Enums.ApplyStatus.PENDING.name(),
                                     Enums.ApplyStatus.APPROVED.name()));
             if (duplicated != null && duplicated > 0) {
@@ -192,11 +194,12 @@ public class ContestService {
                     .distinct()
                     .toList();
             if (!myTeamIds.isEmpty()) {
-                Long teamRegistrations = registrationMapper.selectCount(
-                        Wrappers.<ContestRegistration>lambdaQuery()
-                                .eq(ContestRegistration::getContestId, contestId)
-                                .in(ContestRegistration::getTeamId, myTeamIds)
-                                .in(ContestRegistration::getStatus,
+                Long teamRegistrations = applicationMapper.selectCount(
+                        Wrappers.<Application>lambdaQuery()
+                                .eq(Application::getType, Enums.ApplyType.CONTEST_REGISTER.name())
+                                .eq(Application::getTargetId, contestId)
+                                .in(Application::getTeamId, myTeamIds)
+                                .in(Application::getStatus,
                                         Enums.ApplyStatus.PENDING.name(),
                                         Enums.ApplyStatus.APPROVED.name()));
                 if (teamRegistrations != null && teamRegistrations > 0) {
@@ -209,41 +212,43 @@ public class ContestService {
         data.put("materials", request.getMaterials() == null ? List.of() : request.getMaterials());
         data.put("remark", request.getRemark());
 
-        ContestRegistration registration = new ContestRegistration();
-        registration.setContestId(contestId);
+        Application registration = new Application();
+        registration.setType(Enums.ApplyType.CONTEST_REGISTER.name());
+        registration.setTargetId(contestId);
         registration.setTeamId(request.getTeamId());
-        registration.setMemberId(memberId);
+        registration.setApplicantId(memberId);
         registration.setApplyData(data);
         registration.setStatus(Enums.ApplyStatus.PENDING.name());
         registration.setApplyTime(now);
-        registrationMapper.insert(registration);
+        applicationMapper.insert(registration);
 
         log.info("会员 {} 报名赛事 {}，队伍 {}，报名记录 {}",
                 memberId, contestId, request.getTeamId(),
-                registration.getRegistrationId());
+                registration.getApplyId());
     }
 
     public List<ContestDtos.RegistrationVO> registrations(Long contestId,
                                                           ContestDtos.RegistrationQuery query) {
         getOrThrow(contestId);
-        LambdaQueryWrapper<ContestRegistration> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(ContestRegistration::getContestId, contestId);
+        LambdaQueryWrapper<Application> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(Application::getType, Enums.ApplyType.CONTEST_REGISTER.name())
+                .eq(Application::getTargetId, contestId);
         if (StringUtils.hasText(query.getStatus())) {
-            wrapper.eq(ContestRegistration::getStatus,
+            wrapper.eq(Application::getStatus,
                     parseEnum(Enums.ApplyStatus.class, query.getStatus(), "status").name());
         }
-        wrapper.orderByDesc(ContestRegistration::getApplyTime)
-                .orderByDesc(ContestRegistration::getRegistrationId)
+        wrapper.orderByDesc(Application::getApplyTime)
+                .orderByDesc(Application::getApplyId)
                 .last("LIMIT 500");
 
-        List<ContestRegistration> registrations = registrationMapper.selectList(wrapper);
+        List<Application> registrations = applicationMapper.selectList(wrapper);
         if (registrations.isEmpty()) {
             return List.of();
         }
         List<Long> memberIds = new ArrayList<>();
         List<Long> teamIds = new ArrayList<>();
         registrations.forEach(registration -> {
-            memberIds.add(registration.getMemberId());
+            memberIds.add(registration.getApplicantId());
             if (registration.getAuditorId() != null) {
                 memberIds.add(registration.getAuditorId());
             }
@@ -261,8 +266,10 @@ public class ContestService {
     @Transactional
     public void audit(Long contestId, Long applyId, ContestDtos.AuditRequest request) {
         getOrThrow(contestId);
-        ContestRegistration registration = registrationMapper.selectById(applyId);
-        if (registration == null || !contestId.equals(registration.getContestId())) {
+        Application registration = applicationMapper.selectById(applyId);
+        if (registration == null
+                || !Enums.ApplyType.CONTEST_REGISTER.name().equals(registration.getType())
+                || !contestId.equals(registration.getTargetId())) {
             throw BusinessException.notFound("赛事报名记录不存在");
         }
         if (!Enums.ApplyStatus.PENDING.name().equals(registration.getStatus())) {
@@ -277,7 +284,7 @@ public class ContestService {
         registration.setAuditRemark(request.getRemark());
         registration.setAuditorId(SecurityUtils.currentMemberId());
         registration.setAuditTime(LocalDateTime.now());
-        registrationMapper.updateById(registration);
+        applicationMapper.updateById(registration);
 
         log.info("赛事 {} 报名 {} 审批结果：{}",
                 contestId, applyId, registration.getStatus());
@@ -300,10 +307,11 @@ public class ContestService {
             throw BusinessException.forbidden("当前会员状态不允许提交代码");
         }
 
-        long problemCount = contestProblemMapper.selectCount(
-                Wrappers.<ContestProblem>lambdaQuery()
-                        .eq(ContestProblem::getContestId, contestId)
-                        .eq(ContestProblem::getProblemId, request.getProblemId()));
+        long problemCount = problemLinkMapper.selectCount(
+                Wrappers.<ProblemLink>lambdaQuery()
+                        .eq(ProblemLink::getTargetType, Enums.ProblemTargetType.CONTEST.name())
+                        .eq(ProblemLink::getTargetId, contestId)
+                        .eq(ProblemLink::getProblemId, request.getProblemId()));
         if (problemCount == 0) {
             throw BusinessException.badRequest("该题目不属于本次赛事");
         }
@@ -347,12 +355,13 @@ public class ContestService {
             }
         }
 
-        List<ContestRegistration> approved = registrationMapper.selectList(
-                Wrappers.<ContestRegistration>lambdaQuery()
-                        .eq(ContestRegistration::getContestId, contestId)
-                        .eq(ContestRegistration::getStatus, Enums.ApplyStatus.APPROVED.name()));
+        List<Application> approved = applicationMapper.selectList(
+                Wrappers.<Application>lambdaQuery()
+                        .eq(Application::getType, Enums.ApplyType.CONTEST_REGISTER.name())
+                        .eq(Application::getTargetId, contestId)
+                        .eq(Application::getStatus, Enums.ApplyStatus.APPROVED.name()));
         List<Long> registeredTeamIds = approved.stream()
-                .map(ContestRegistration::getTeamId)
+                .map(Application::getTeamId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -364,25 +373,25 @@ public class ContestService {
                                 Function.identity(), (a, b) -> a));
 
         List<Long> memberIds = new ArrayList<>(approved.stream()
-                .map(ContestRegistration::getMemberId).toList());
+                .map(Application::getApplicantId).toList());
         memberIds.addAll(memberTeamMap.keySet());
         Map<Long, Member> memberMap = loadMembers(memberIds);
 
         Map<String, BoardGroup> groups = new LinkedHashMap<>();
-        for (ContestRegistration registration : approved) {
-            Member applicant = memberMap.get(registration.getMemberId());
+        for (Application registration : approved) {
+            Member applicant = memberMap.get(registration.getApplicantId());
             if (registration.getTeamId() != null) {
                 ContestRows.TeamRow team = teamMap.get(registration.getTeamId());
                 String key = "T" + registration.getTeamId();
                 groups.computeIfAbsent(key, k -> BoardGroup.team(
                         registration.getTeamId(),
                         team == null ? "未知队伍" : team.getName(),
-                        registration.getMemberId(),
+                        registration.getApplicantId(),
                         applicant == null ? "未知会员" : applicant.getName()));
             } else {
-                String key = "U" + registration.getMemberId();
+                String key = "U" + registration.getApplicantId();
                 groups.computeIfAbsent(key, k -> BoardGroup.member(
-                        registration.getMemberId(),
+                        registration.getApplicantId(),
                         applicant == null ? "未知会员" : applicant.getName()));
             }
         }
@@ -556,16 +565,17 @@ public class ContestService {
     }
 
     private boolean isApprovedParticipant(Long contestId, Long memberId) {
-        List<ContestRegistration> approved = registrationMapper.selectList(
-                Wrappers.<ContestRegistration>lambdaQuery()
-                        .eq(ContestRegistration::getContestId, contestId)
-                        .eq(ContestRegistration::getStatus, Enums.ApplyStatus.APPROVED.name()));
+        List<Application> approved = applicationMapper.selectList(
+                Wrappers.<Application>lambdaQuery()
+                        .eq(Application::getType, Enums.ApplyType.CONTEST_REGISTER.name())
+                        .eq(Application::getTargetId, contestId)
+                        .eq(Application::getStatus, Enums.ApplyStatus.APPROVED.name()));
         if (approved.stream().anyMatch(registration -> registration.getTeamId() == null
-                && memberId.equals(registration.getMemberId()))) {
+                && memberId.equals(registration.getApplicantId()))) {
             return true;
         }
         List<Long> teamIds = approved.stream()
-                .map(ContestRegistration::getTeamId)
+                .map(Application::getTeamId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
@@ -618,19 +628,19 @@ public class ContestService {
     }
 
     private ContestDtos.RegistrationVO toRegistrationVO(
-            ContestRegistration registration, Map<Long, Member> memberMap,
+            Application registration, Map<Long, Member> memberMap,
             Map<Long, ContestRows.TeamRow> teamMap) {
-        Member applicant = memberMap.get(registration.getMemberId());
+        Member applicant = memberMap.get(registration.getApplicantId());
         Member auditor = registration.getAuditorId() == null
                 ? null : memberMap.get(registration.getAuditorId());
         ContestRows.TeamRow team = registration.getTeamId() == null
                 ? null : teamMap.get(registration.getTeamId());
         return ContestDtos.RegistrationVO.builder()
-                .applyId(registration.getRegistrationId())
-                .contestId(registration.getContestId())
+                .applyId(registration.getApplyId())
+                .contestId(registration.getTargetId())
                 .teamId(registration.getTeamId())
                 .teamName(team == null ? null : team.getName())
-                .applicantId(registration.getMemberId())
+                .applicantId(registration.getApplicantId())
                 .applicantName(applicant == null ? null : applicant.getName())
                 .studentId(applicant == null ? null : applicant.getStudentId())
                 .applyData(registration.getApplyData())
@@ -682,11 +692,12 @@ public class ContestService {
     private void saveContestProblems(Long contestId, List<Long> problemIds) {
         int sort = 0;
         for (Long problemId : problemIds) {
-            ContestProblem link = new ContestProblem();
-            link.setContestId(contestId);
+            ProblemLink link = new ProblemLink();
+            link.setTargetType(Enums.ProblemTargetType.CONTEST.name());
+            link.setTargetId(contestId);
             link.setProblemId(problemId);
             link.setSortOrder(sort++);
-            contestProblemMapper.insert(link);
+            problemLinkMapper.insert(link);
         }
     }
 

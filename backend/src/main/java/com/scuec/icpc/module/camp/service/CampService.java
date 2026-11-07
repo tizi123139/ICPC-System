@@ -8,17 +8,17 @@ import com.scuec.icpc.common.exception.BusinessException;
 import com.scuec.icpc.common.security.SecurityUtils;
 import com.scuec.icpc.module.camp.dto.CampDtos;
 import com.scuec.icpc.module.camp.dto.CampRows;
+import com.scuec.icpc.module.application.entity.Application;
+import com.scuec.icpc.module.application.mapper.ApplicationMapper;
 import com.scuec.icpc.module.camp.entity.Attendance;
 import com.scuec.icpc.module.camp.entity.Camp;
-import com.scuec.icpc.module.camp.entity.CampRegistration;
 import com.scuec.icpc.module.camp.entity.CampTask;
-import com.scuec.icpc.module.camp.entity.CampTaskProblem;
 import com.scuec.icpc.module.camp.mapper.AttendanceMapper;
 import com.scuec.icpc.module.camp.mapper.CampMapper;
 import com.scuec.icpc.module.camp.mapper.CampQueryMapper;
-import com.scuec.icpc.module.camp.mapper.CampRegistrationMapper;
 import com.scuec.icpc.module.camp.mapper.CampTaskMapper;
-import com.scuec.icpc.module.camp.mapper.CampTaskProblemMapper;
+import com.scuec.icpc.module.problem.entity.ProblemLink;
+import com.scuec.icpc.module.problem.mapper.ProblemLinkMapper;
 import com.scuec.icpc.module.member.entity.Member;
 import com.scuec.icpc.module.member.mapper.MemberMapper;
 import lombok.RequiredArgsConstructor;
@@ -49,9 +49,9 @@ import java.util.stream.Collectors;
 public class CampService {
 
     private final CampMapper campMapper;
-    private final CampRegistrationMapper campRegistrationMapper;
+    private final ApplicationMapper applicationMapper;
     private final CampTaskMapper campTaskMapper;
-    private final CampTaskProblemMapper campTaskProblemMapper;
+    private final ProblemLinkMapper problemLinkMapper;
     private final AttendanceMapper attendanceMapper;
     private final CampQueryMapper queryMapper;
     private final MemberMapper memberMapper;
@@ -154,11 +154,12 @@ public class CampService {
             throw BusinessException.conflict("集训已开始，无法报名");
         }
 
-        Long duplicated = campRegistrationMapper.selectCount(
-                Wrappers.<CampRegistration>lambdaQuery()
-                        .eq(CampRegistration::getCampId, campId)
-                        .eq(CampRegistration::getMemberId, memberId)
-                        .in(CampRegistration::getStatus,
+        Long duplicated = applicationMapper.selectCount(
+                Wrappers.<Application>lambdaQuery()
+                        .eq(Application::getType, Enums.ApplyType.CAMP_REGISTER.name())
+                        .eq(Application::getTargetId, campId)
+                        .eq(Application::getApplicantId, memberId)
+                        .in(Application::getStatus,
                                 Enums.ApplyStatus.PENDING.name(),
                                 Enums.ApplyStatus.APPROVED.name()));
         if (duplicated != null && duplicated > 0) {
@@ -172,38 +173,40 @@ public class CampService {
                 ? List.of()
                 : request.getAvailableDates().stream().map(LocalDate::toString).toList());
 
-        CampRegistration registration = new CampRegistration();
-        registration.setCampId(campId);
-        registration.setMemberId(memberId);
+        Application registration = new Application();
+        registration.setType(Enums.ApplyType.CAMP_REGISTER.name());
+        registration.setTargetId(campId);
+        registration.setApplicantId(memberId);
         registration.setApplyData(data);
         registration.setStatus(Enums.ApplyStatus.PENDING.name());
         registration.setApplyTime(now);
-        campRegistrationMapper.insert(registration);
+        applicationMapper.insert(registration);
 
         log.info("会员 {} 提交集训 {} 报名，报名记录 {}",
-                memberId, campId, registration.getRegistrationId());
+                memberId, campId, registration.getApplyId());
     }
 
     public List<CampDtos.RegistrationVO> registrations(Long campId,
                                                       CampDtos.RegistrationQuery query) {
         getOrThrow(campId);
-        LambdaQueryWrapper<CampRegistration> wrapper = Wrappers.lambdaQuery();
-        wrapper.eq(CampRegistration::getCampId, campId);
+        LambdaQueryWrapper<Application> wrapper = Wrappers.lambdaQuery();
+        wrapper.eq(Application::getType, Enums.ApplyType.CAMP_REGISTER.name())
+                .eq(Application::getTargetId, campId);
         if (StringUtils.hasText(query.getStatus())) {
-            wrapper.eq(CampRegistration::getStatus,
+            wrapper.eq(Application::getStatus,
                     parseEnum(Enums.ApplyStatus.class, query.getStatus(), "status").name());
         }
-        wrapper.orderByDesc(CampRegistration::getApplyTime)
-                .orderByDesc(CampRegistration::getRegistrationId)
+        wrapper.orderByDesc(Application::getApplyTime)
+                .orderByDesc(Application::getApplyId)
                 .last("LIMIT 500");
 
-        List<CampRegistration> registrations = campRegistrationMapper.selectList(wrapper);
+        List<Application> registrations = applicationMapper.selectList(wrapper);
         if (registrations.isEmpty()) {
             return List.of();
         }
         List<Long> memberIds = new ArrayList<>();
         registrations.forEach(registration -> {
-            memberIds.add(registration.getMemberId());
+            memberIds.add(registration.getApplicantId());
             if (registration.getAuditorId() != null) {
                 memberIds.add(registration.getAuditorId());
             }
@@ -217,8 +220,10 @@ public class CampService {
     @Transactional
     public void audit(Long campId, Long applyId, CampDtos.AuditRequest request) {
         getOrThrow(campId);
-        CampRegistration registration = campRegistrationMapper.selectById(applyId);
-        if (registration == null || !campId.equals(registration.getCampId())) {
+        Application registration = applicationMapper.selectById(applyId);
+        if (registration == null
+                || !Enums.ApplyType.CAMP_REGISTER.name().equals(registration.getType())
+                || !campId.equals(registration.getTargetId())) {
             throw BusinessException.notFound("集训报名记录不存在");
         }
         if (!Enums.ApplyStatus.PENDING.name().equals(registration.getStatus())) {
@@ -233,7 +238,7 @@ public class CampService {
         registration.setAuditRemark(request.getRemark());
         registration.setAuditorId(SecurityUtils.currentMemberId());
         registration.setAuditTime(LocalDateTime.now());
-        campRegistrationMapper.updateById(registration);
+        applicationMapper.updateById(registration);
 
         log.info("集训 {} 报名 {} 审批结果：{}",
                 campId, applyId, registration.getStatus());
@@ -277,11 +282,12 @@ public class CampService {
         }
         validateCheckInDate(camp, request.getDate());
 
-        Long approved = campRegistrationMapper.selectCount(
-                Wrappers.<CampRegistration>lambdaQuery()
-                        .eq(CampRegistration::getCampId, campId)
-                        .eq(CampRegistration::getMemberId, memberId)
-                        .eq(CampRegistration::getStatus, Enums.ApplyStatus.APPROVED.name()));
+        Long approved = applicationMapper.selectCount(
+                Wrappers.<Application>lambdaQuery()
+                        .eq(Application::getType, Enums.ApplyType.CAMP_REGISTER.name())
+                        .eq(Application::getTargetId, campId)
+                        .eq(Application::getApplicantId, memberId)
+                        .eq(Application::getStatus, Enums.ApplyStatus.APPROVED.name()));
         if (approved == null || approved == 0) {
             throw BusinessException.forbidden("仅报名审核通过的学员可签到");
         }
@@ -436,15 +442,15 @@ public class CampService {
                 .build();
     }
 
-    private CampDtos.RegistrationVO toRegistrationVO(CampRegistration registration,
+    private CampDtos.RegistrationVO toRegistrationVO(Application registration,
                                                      Map<Long, Member> memberMap) {
-        Member applicant = memberMap.get(registration.getMemberId());
+        Member applicant = memberMap.get(registration.getApplicantId());
         Member auditor = registration.getAuditorId() == null
                 ? null : memberMap.get(registration.getAuditorId());
         return CampDtos.RegistrationVO.builder()
-                .applyId(registration.getRegistrationId())
-                .campId(registration.getCampId())
-                .applicantId(registration.getMemberId())
+                .applyId(registration.getApplyId())
+                .campId(registration.getTargetId())
+                .applicantId(registration.getApplicantId())
                 .applicantName(applicant == null ? null : applicant.getName())
                 .studentId(applicant == null ? null : applicant.getStudentId())
                 .applyData(registration.getApplyData())
@@ -497,11 +503,12 @@ public class CampService {
     private void saveTaskProblems(Long taskId, List<Long> problemIds) {
         int sort = 0;
         for (Long problemId : problemIds) {
-            CampTaskProblem link = new CampTaskProblem();
-            link.setTaskId(taskId);
+            ProblemLink link = new ProblemLink();
+            link.setTargetType(Enums.ProblemTargetType.CAMP_TASK.name());
+            link.setTargetId(taskId);
             link.setProblemId(problemId);
             link.setSortOrder(sort++);
-            campTaskProblemMapper.insert(link);
+            problemLinkMapper.insert(link);
         }
     }
 

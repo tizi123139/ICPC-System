@@ -71,4 +71,11 @@ public final class Enums {
     public enum ContestStatus {
         ANNOUNCED, REGISTERING, ONGOING, ENDED
     }
+
+    /**
+     * 通用题目关联表的归属类型。
+     */
+    public enum ProblemTargetType {
+        TRAINING, CAMP_TASK, CONTEST
+    }
 }

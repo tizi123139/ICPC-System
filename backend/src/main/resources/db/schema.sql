@@ -47,10 +47,15 @@ CREATE TABLE IF NOT EXISTS member_role (
     KEY idx_member_role_code (role_code)
 ) ENGINE = InnoDB COMMENT = '会员-角色关联';
 
-CREATE TABLE IF NOT EXISTS member_apply (
+-- 通用申请表：入会/退会/集训报名/赛事报名共用同一张表。
+-- type 取值：JOIN_MEMBER / RESIGN / CAMP_REGISTER / CONTEST_REGISTER。
+-- target_id 指向集训或赛事主键，入会/退会申请为空；team_id 仅赛事组队报名使用。
+CREATE TABLE IF NOT EXISTS application (
     apply_id     BIGINT      NOT NULL AUTO_INCREMENT,
-    type         VARCHAR(30) NOT NULL COMMENT 'JOIN_MEMBER/RESIGN',
-    applicant_id BIGINT      NULL,
+    type         VARCHAR(30) NOT NULL COMMENT 'JOIN_MEMBER/RESIGN/CAMP_REGISTER/CONTEST_REGISTER',
+    target_id    BIGINT      NULL COMMENT '集训/赛事 ID，入会/退会为空',
+    applicant_id BIGINT      NULL COMMENT '申请人，入会申请审核通过前可为空',
+    team_id      BIGINT      NULL COMMENT '赛事组队报名时的队伍 ID',
     apply_data   JSON        NULL,
     status       VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     audit_remark VARCHAR(500) NULL,
@@ -61,9 +66,10 @@ CREATE TABLE IF NOT EXISTS member_apply (
     update_time  DATETIME    NULL,
     deleted      TINYINT     NOT NULL DEFAULT 0,
     PRIMARY KEY (apply_id),
-    KEY idx_apply_status (status),
-    KEY idx_apply_applicant (applicant_id)
-) ENGINE = InnoDB COMMENT = '入会/退会申请';
+    KEY idx_application_target (type, target_id, status),
+    KEY idx_application_applicant (applicant_id),
+    KEY idx_application_team (team_id)
+) ENGINE = InnoDB COMMENT = '通用申请（入会/退会/集训报名/赛事报名）';
 
 -- ==================== 知识点与题库 ====================
 CREATE TABLE IF NOT EXISTS tag (
@@ -112,6 +118,20 @@ CREATE TABLE IF NOT EXISTS problem_tag (
     KEY idx_problem_tag_tag (tag_id)
 ) ENGINE = InnoDB COMMENT = '题目-知识点关联';
 
+-- 通用题目关联表：训练、集训任务、赛事共用。
+-- target_type 取值：TRAINING / CAMP_TASK / CONTEST。
+CREATE TABLE IF NOT EXISTS problem_link (
+    id          BIGINT      NOT NULL AUTO_INCREMENT,
+    target_type VARCHAR(20) NOT NULL COMMENT 'TRAINING/CAMP_TASK/CONTEST',
+    target_id   BIGINT      NOT NULL COMMENT '训练/集训任务/赛事 ID',
+    problem_id  BIGINT      NOT NULL,
+    sort_order  INT         NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_problem_link (target_type, target_id, problem_id),
+    KEY idx_problem_link_target (target_type, target_id),
+    KEY idx_problem_link_problem (problem_id)
+) ENGINE = InnoDB COMMENT = '通用题目关联（训练/集训任务/赛事）';
+
 CREATE TABLE IF NOT EXISTS solution (
     solution_id    BIGINT   NOT NULL AUTO_INCREMENT,
     problem_id     BIGINT   NOT NULL,
@@ -143,15 +163,6 @@ CREATE TABLE IF NOT EXISTS training (
     KEY idx_training_status (status),
     KEY idx_training_creator (creator_id)
 ) ENGINE = InnoDB COMMENT = '训练';
-
-CREATE TABLE IF NOT EXISTS training_problem (
-    id          BIGINT NOT NULL AUTO_INCREMENT,
-    training_id BIGINT NOT NULL,
-    problem_id  BIGINT NOT NULL,
-    sort_order  INT    NOT NULL DEFAULT 0,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_training_problem (training_id, problem_id)
-) ENGINE = InnoDB COMMENT = '训练-题目关联';
 
 CREATE TABLE IF NOT EXISTS submission (
     submit_id     BIGINT      NOT NULL AUTO_INCREMENT,
@@ -221,24 +232,6 @@ CREATE TABLE IF NOT EXISTS camp (
     KEY idx_camp_start_time (start_time)
 ) ENGINE = InnoDB COMMENT = '集训';
 
-CREATE TABLE IF NOT EXISTS camp_registration (
-    registration_id BIGINT      NOT NULL AUTO_INCREMENT,
-    camp_id         BIGINT      NOT NULL,
-    member_id       BIGINT      NOT NULL,
-    apply_data      JSON        NULL,
-    status          VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    audit_remark    VARCHAR(500) NULL,
-    auditor_id      BIGINT      NULL,
-    apply_time      DATETIME    NULL,
-    audit_time      DATETIME    NULL,
-    create_time     DATETIME    NULL,
-    update_time     DATETIME    NULL,
-    deleted         TINYINT     NOT NULL DEFAULT 0,
-    PRIMARY KEY (registration_id),
-    KEY idx_camp_reg_camp (camp_id, status),
-    KEY idx_camp_reg_member (member_id)
-) ENGINE = InnoDB COMMENT = '集训报名';
-
 CREATE TABLE IF NOT EXISTS camp_task (
     task_id     BIGINT       NOT NULL AUTO_INCREMENT,
     camp_id     BIGINT       NOT NULL,
@@ -252,16 +245,6 @@ CREATE TABLE IF NOT EXISTS camp_task (
     PRIMARY KEY (task_id),
     KEY idx_camp_task_camp (camp_id)
 ) ENGINE = InnoDB COMMENT = '集训每日任务';
-
-CREATE TABLE IF NOT EXISTS camp_task_problem (
-    id         BIGINT NOT NULL AUTO_INCREMENT,
-    task_id    BIGINT NOT NULL,
-    problem_id BIGINT NOT NULL,
-    sort_order INT    NOT NULL DEFAULT 0,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_camp_task_problem (task_id, problem_id),
-    KEY idx_camp_task_problem_task (task_id)
-) ENGINE = InnoDB COMMENT = '集训任务-题目关联';
 
 CREATE TABLE IF NOT EXISTS attendance (
     record_id     BIGINT      NOT NULL AUTO_INCREMENT,
@@ -301,35 +284,6 @@ CREATE TABLE IF NOT EXISTS contest (
     KEY idx_contest_category (category),
     KEY idx_contest_status (status)
 ) ENGINE = InnoDB COMMENT = '赛事（校赛/XCPC/非XCPC）';
-
-CREATE TABLE IF NOT EXISTS contest_problem (
-    id          BIGINT NOT NULL AUTO_INCREMENT,
-    contest_id  BIGINT NOT NULL,
-    problem_id  BIGINT NOT NULL,
-    sort_order  INT    NOT NULL DEFAULT 0,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_contest_problem (contest_id, problem_id)
-) ENGINE = InnoDB COMMENT = '赛事-题目关联';
-
-CREATE TABLE IF NOT EXISTS contest_registration (
-    registration_id BIGINT      NOT NULL AUTO_INCREMENT,
-    contest_id      BIGINT      NOT NULL,
-    team_id         BIGINT      NULL,
-    member_id       BIGINT      NOT NULL,
-    apply_data      JSON        NULL,
-    status          VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    audit_remark    VARCHAR(500) NULL,
-    auditor_id      BIGINT      NULL,
-    apply_time      DATETIME    NULL,
-    audit_time      DATETIME    NULL,
-    create_time     DATETIME    NULL,
-    update_time     DATETIME    NULL,
-    deleted         TINYINT     NOT NULL DEFAULT 0,
-    PRIMARY KEY (registration_id),
-    KEY idx_contest_reg (contest_id, status),
-    KEY idx_contest_reg_team (team_id),
-    KEY idx_contest_reg_member (member_id)
-) ENGINE = InnoDB COMMENT = '赛事报名';
 
 CREATE TABLE IF NOT EXISTS contest_result (
     result_id     BIGINT       NOT NULL AUTO_INCREMENT,

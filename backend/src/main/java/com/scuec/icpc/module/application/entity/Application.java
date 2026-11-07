@@ -1,4 +1,4 @@
-package com.scuec.icpc.module.contest.entity;
+package com.scuec.icpc.module.application.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -13,20 +13,36 @@ import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
- * 赛事报名实体，对应 contest_registration 表。
- * 个人赛 teamId 为空；组队赛以队伍为单位报名。
+ * 通用申请实体，对应 application 表。
+ * type 区分入会、退会、集训报名、赛事报名，applyData 保存各类型各自的表单 JSON。
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName(value = "contest_registration", autoResultMap = true)
-public class ContestRegistration extends BaseEntity {
+@TableName(value = "application", autoResultMap = true)
+public class Application extends BaseEntity {
 
     @TableId(type = IdType.AUTO)
-    private Long registrationId;
+    private Long applyId;
 
-    private Long contestId;
+    /**
+     * JOIN_MEMBER / RESIGN / CAMP_REGISTER / CONTEST_REGISTER。
+     */
+    private String type;
+
+    /**
+     * 集训或赛事主键；入会/退会申请为空。
+     */
+    private Long targetId;
+
+    /**
+     * 申请人；入会申请审核通过前为空。
+     */
+    private Long applicantId;
+
+    /**
+     * 赛事组队报名时的队伍 ID，其他申请为空。
+     */
     private Long teamId;
-    private Long memberId;
 
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> applyData;

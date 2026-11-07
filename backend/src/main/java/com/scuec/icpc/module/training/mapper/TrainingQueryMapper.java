@@ -30,9 +30,9 @@ public interface TrainingQueryMapper {
                    p.sample_output AS sampleOutput,
                    p.hint         AS hint,
                    p.visibility   AS visibility
-            FROM training_problem tp
+            FROM problem_link tp
             JOIN problem p ON p.problem_id = tp.problem_id AND p.deleted = 0
-            WHERE tp.training_id = #{trainingId}
+            WHERE tp.target_type = 'TRAINING' AND tp.target_id = #{trainingId}
             ORDER BY tp.sort_order, tp.id
             """)
     List<TrainingDtos.ProblemItem> selectTrainingProblems(@Param("trainingId") Long trainingId);
@@ -42,10 +42,10 @@ public interface TrainingQueryMapper {
                    t.tag_id      AS tagId,
                    t.name        AS name,
                    t.category    AS category
-            FROM training_problem tp
+            FROM problem_link tp
             JOIN problem_tag pt ON pt.problem_id = tp.problem_id
             JOIN tag t ON t.tag_id = pt.tag_id AND t.deleted = 0
-            WHERE tp.training_id = #{trainingId}
+            WHERE tp.target_type = 'TRAINING' AND tp.target_id = #{trainingId}
             ORDER BY t.sort_order, t.tag_id
             """)
     List<TrainingRows.ProblemTagRow> selectTrainingProblemTags(@Param("trainingId") Long trainingId);

@@ -12,12 +12,12 @@ import com.scuec.icpc.module.member.entity.Member;
 import com.scuec.icpc.module.member.mapper.MemberMapper;
 import com.scuec.icpc.module.training.dto.TrainingDtos;
 import com.scuec.icpc.module.training.dto.TrainingRows;
+import com.scuec.icpc.module.problem.entity.ProblemLink;
+import com.scuec.icpc.module.problem.mapper.ProblemLinkMapper;
 import com.scuec.icpc.module.training.entity.Submission;
 import com.scuec.icpc.module.training.entity.Training;
-import com.scuec.icpc.module.training.entity.TrainingProblem;
 import com.scuec.icpc.module.training.mapper.SubmissionMapper;
 import com.scuec.icpc.module.training.mapper.TrainingMapper;
-import com.scuec.icpc.module.training.mapper.TrainingProblemMapper;
 import com.scuec.icpc.module.training.mapper.TrainingQueryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,7 +51,7 @@ public class TrainingService {
             List.of("WA", "TLE", "MLE", "RE", "CE");
 
     private final TrainingMapper trainingMapper;
-    private final TrainingProblemMapper trainingProblemMapper;
+    private final ProblemLinkMapper problemLinkMapper;
     private final SubmissionMapper submissionMapper;
     private final TrainingQueryMapper queryMapper;
     private final MemberMapper memberMapper;
@@ -176,8 +176,7 @@ public class TrainingService {
                 throw BusinessException.badRequest("训练题目不能为空");
             }
             validateProblems(problemIds);
-            trainingProblemMapper.delete(Wrappers.<TrainingProblem>lambdaQuery()
-                    .eq(TrainingProblem::getTrainingId, trainingId));
+            removeProblemLinks(trainingId);
             saveProblems(trainingId, problemIds);
         }
 
@@ -197,8 +196,7 @@ public class TrainingService {
             throw BusinessException.conflict("仅草稿状态的训练可以删除");
         }
         trainingMapper.deleteById(trainingId);
-        trainingProblemMapper.delete(Wrappers.<TrainingProblem>lambdaQuery()
-                .eq(TrainingProblem::getTrainingId, trainingId));
+        removeProblemLinks(trainingId);
     }
 
     @Transactional
@@ -586,14 +584,15 @@ public class TrainingService {
         if (trainingIds.isEmpty()) {
             return Map.of();
         }
-        List<TrainingProblem> links = trainingProblemMapper.selectList(
-                Wrappers.<TrainingProblem>lambdaQuery()
-                        .in(TrainingProblem::getTrainingId, trainingIds)
-                        .orderByAsc(TrainingProblem::getSortOrder)
-                        .orderByAsc(TrainingProblem::getId));
+        List<ProblemLink> links = problemLinkMapper.selectList(
+                Wrappers.<ProblemLink>lambdaQuery()
+                        .eq(ProblemLink::getTargetType, Enums.ProblemTargetType.TRAINING.name())
+                        .in(ProblemLink::getTargetId, trainingIds)
+                        .orderByAsc(ProblemLink::getSortOrder)
+                        .orderByAsc(ProblemLink::getId));
         Map<Long, List<Long>> result = new HashMap<>();
-        for (TrainingProblem link : links) {
-            result.computeIfAbsent(link.getTrainingId(), k -> new ArrayList<>())
+        for (ProblemLink link : links) {
+            result.computeIfAbsent(link.getTargetId(), k -> new ArrayList<>())
                     .add(link.getProblemId());
         }
         return result;
@@ -629,14 +628,21 @@ public class TrainingService {
                         Function.identity(), (a, b) -> a));
     }
 
+    private void removeProblemLinks(Long trainingId) {
+        problemLinkMapper.delete(Wrappers.<ProblemLink>lambdaQuery()
+                .eq(ProblemLink::getTargetType, Enums.ProblemTargetType.TRAINING.name())
+                .eq(ProblemLink::getTargetId, trainingId));
+    }
+
     private void saveProblems(Long trainingId, List<Long> problemIds) {
         int sort = 0;
         for (Long problemId : problemIds) {
-            TrainingProblem link = new TrainingProblem();
-            link.setTrainingId(trainingId);
+            ProblemLink link = new ProblemLink();
+            link.setTargetType(Enums.ProblemTargetType.TRAINING.name());
+            link.setTargetId(trainingId);
             link.setProblemId(problemId);
             link.setSortOrder(sort++);
-            trainingProblemMapper.insert(link);
+            problemLinkMapper.insert(link);
         }
     }
 

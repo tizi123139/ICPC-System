@@ -43,13 +43,15 @@ public interface MemberMapper extends BaseMapper<Member> {
                    cres.solved_count   AS solvedCount,
                    cres.penalty        AS penalty,
                    cres.award          AS award
-            FROM contest_registration cr
-            JOIN contest c ON c.contest_id = cr.contest_id AND c.deleted = 0
+            FROM application cr
+            JOIN contest c ON c.contest_id = cr.target_id AND c.deleted = 0
             LEFT JOIN contest_result cres
-                   ON cres.contest_id = cr.contest_id
-                  AND cres.member_id = cr.member_id
+                   ON cres.contest_id = cr.target_id
+                  AND cres.member_id = cr.applicant_id
                   AND cres.deleted = 0
-            WHERE cr.member_id = #{memberId} AND cr.deleted = 0
+            WHERE cr.applicant_id = #{memberId}
+              AND cr.type = 'CONTEST_REGISTER'
+              AND cr.deleted = 0
             ORDER BY c.start_time DESC
             LIMIT 100
             """)

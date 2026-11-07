@@ -8,11 +8,11 @@ import com.scuec.icpc.common.constant.Roles;
 import com.scuec.icpc.common.enums.Enums;
 import com.scuec.icpc.common.exception.BusinessException;
 import com.scuec.icpc.common.security.SecurityUtils;
+import com.scuec.icpc.module.application.entity.Application;
+import com.scuec.icpc.module.application.mapper.ApplicationMapper;
 import com.scuec.icpc.module.member.dto.MemberDtos;
 import com.scuec.icpc.module.member.entity.Member;
-import com.scuec.icpc.module.member.entity.MemberApply;
 import com.scuec.icpc.module.member.entity.MemberRole;
-import com.scuec.icpc.module.member.mapper.MemberApplyMapper;
 import com.scuec.icpc.module.member.mapper.MemberMapper;
 import com.scuec.icpc.module.member.mapper.MemberRoleMapper;
 import lombok.RequiredArgsConstructor;
@@ -49,7 +49,7 @@ public class MemberService {
             List.of(Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.LAB_MEMBER);
 
     private final MemberMapper memberMapper;
-    private final MemberApplyMapper memberApplyMapper;
+    private final ApplicationMapper applicationMapper;
     private final MemberRoleMapper memberRoleMapper;
     private final PasswordEncoder passwordEncoder;
 
@@ -225,12 +225,12 @@ public class MemberService {
         data.put("email", request.getEmail());
         data.put("reason", request.getReason());
 
-        MemberApply apply = new MemberApply();
+        Application apply = new Application();
         apply.setType(Enums.ApplyType.JOIN_MEMBER.name());
         apply.setApplyData(data);
         apply.setStatus(Enums.ApplyStatus.PENDING.name());
         apply.setApplyTime(LocalDateTime.now());
-        memberApplyMapper.insert(apply);
+        applicationMapper.insert(apply);
     }
 
     @Transactional
@@ -240,10 +240,10 @@ public class MemberService {
         if (!Enums.MemberStatus.ACTIVE.name().equals(member.getStatus())) {
             throw BusinessException.conflict("当前会员状态不允许提交退会申请");
         }
-        Long pending = memberApplyMapper.selectCount(Wrappers.<MemberApply>lambdaQuery()
-                .eq(MemberApply::getApplicantId, memberId)
-                .eq(MemberApply::getType, Enums.ApplyType.RESIGN.name())
-                .eq(MemberApply::getStatus, Enums.ApplyStatus.PENDING.name()));
+        Long pending = applicationMapper.selectCount(Wrappers.<Application>lambdaQuery()
+                .eq(Application::getApplicantId, memberId)
+                .eq(Application::getType, Enums.ApplyType.RESIGN.name())
+                .eq(Application::getStatus, Enums.ApplyStatus.PENDING.name()));
         if (pending != null && pending > 0) {
             throw BusinessException.conflict("已有待审批的退会申请，请勿重复提交");
         }
@@ -251,35 +251,44 @@ public class MemberService {
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("reason", request.getReason());
 
-        MemberApply apply = new MemberApply();
+        Application apply = new Application();
         apply.setType(Enums.ApplyType.RESIGN.name());
         apply.setApplicantId(memberId);
         apply.setApplyData(data);
         apply.setStatus(Enums.ApplyStatus.PENDING.name());
         apply.setApplyTime(LocalDateTime.now());
-        memberApplyMapper.insert(apply);
+        applicationMapper.insert(apply);
     }
 
     public List<MemberDtos.ApplyVO> listApprovals(MemberDtos.ApplyQuery query) {
-        LambdaQueryWrapper<MemberApply> wrapper = Wrappers.lambdaQuery();
+        LambdaQueryWrapper<Application> wrapper = Wrappers.lambdaQuery();
         if (StringUtils.hasText(query.getType())) {
-            wrapper.eq(MemberApply::getType,
-                    parseEnum(Enums.ApplyType.class, query.getType(), "type").name());
+            String type = parseEnum(Enums.ApplyType.class, query.getType(), "type").name();
+            if (!Enums.ApplyType.JOIN_MEMBER.name().equals(type)
+                    && !Enums.ApplyType.RESIGN.name().equals(type)) {
+                throw BusinessException.badRequest("会员审批仅支持入会/退会申请");
+            }
+            wrapper.eq(Application::getType, type);
+        } else {
+            // 通用申请表还承载集训/赛事报名，会员审批默认只看入会与退会。
+            wrapper.in(Application::getType,
+                    Enums.ApplyType.JOIN_MEMBER.name(),
+                    Enums.ApplyType.RESIGN.name());
         }
         if (StringUtils.hasText(query.getStatus())) {
-            wrapper.eq(MemberApply::getStatus,
+            wrapper.eq(Application::getStatus,
                     parseEnum(Enums.ApplyStatus.class, query.getStatus(), "status").name());
         }
-        wrapper.orderByDesc(MemberApply::getApplyTime)
-                .orderByDesc(MemberApply::getApplyId)
+        wrapper.orderByDesc(Application::getApplyTime)
+                .orderByDesc(Application::getApplyId)
                 .last("LIMIT 200");
-        List<MemberApply> applies = memberApplyMapper.selectList(wrapper);
+        List<Application> applies = applicationMapper.selectList(wrapper);
         if (applies.isEmpty()) {
             return List.of();
         }
 
         List<Long> memberIds = new ArrayList<>();
-        for (MemberApply apply : applies) {
+        for (Application apply : applies) {
             if (apply.getApplicantId() != null) {
                 memberIds.add(apply.getApplicantId());
             }
@@ -293,8 +302,10 @@ public class MemberService {
 
     @Transactional
     public void audit(Long applyId, MemberDtos.AuditRequest request) {
-        MemberApply apply = memberApplyMapper.selectById(applyId);
-        if (apply == null) {
+        Application apply = applicationMapper.selectById(applyId);
+        if (apply == null
+                || (!Enums.ApplyType.JOIN_MEMBER.name().equals(apply.getType())
+                && !Enums.ApplyType.RESIGN.name().equals(apply.getType()))) {
             throw BusinessException.notFound("申请记录不存在");
         }
         if (!Enums.ApplyStatus.PENDING.name().equals(apply.getStatus())) {
@@ -330,10 +341,10 @@ public class MemberService {
         apply.setAuditRemark(request.getRemark());
         apply.setAuditorId(SecurityUtils.currentMemberId());
         apply.setAuditTime(LocalDateTime.now());
-        memberApplyMapper.updateById(apply);
+        applicationMapper.updateById(apply);
     }
 
-    private void approveJoin(MemberApply apply) {
+    private void approveJoin(Application apply) {
         Map<String, Object> data = apply.getApplyData() == null
                 ? Collections.emptyMap() : apply.getApplyData();
         String studentId = stringValue(data, "studentId");
@@ -366,7 +377,7 @@ public class MemberService {
                 apply.getApplyId(), member.getMemberId(), member.getStudentId());
     }
 
-    private void approveResign(MemberApply apply) {
+    private void approveResign(Application apply) {
         if (apply.getApplicantId() == null) {
             throw BusinessException.badRequest("退会申请缺少申请人信息");
         }
@@ -380,10 +391,10 @@ public class MemberService {
                 apply.getApplyId(), member.getMemberId());
     }
 
-    private List<MemberApply> pendingJoinApplications() {
-        return memberApplyMapper.selectList(Wrappers.<MemberApply>lambdaQuery()
-                .eq(MemberApply::getType, Enums.ApplyType.JOIN_MEMBER.name())
-                .eq(MemberApply::getStatus, Enums.ApplyStatus.PENDING.name()));
+    private List<Application> pendingJoinApplications() {
+        return applicationMapper.selectList(Wrappers.<Application>lambdaQuery()
+                .eq(Application::getType, Enums.ApplyType.JOIN_MEMBER.name())
+                .eq(Application::getStatus, Enums.ApplyStatus.PENDING.name()));
     }
 
     // ==================== 内部工具 ====================
@@ -416,7 +427,7 @@ public class MemberService {
                 .build();
     }
 
-    private MemberDtos.ApplyVO toApplyVO(MemberApply apply, Map<Long, String> nameMap) {
+    private MemberDtos.ApplyVO toApplyVO(Application apply, Map<Long, String> nameMap) {
         String applicantName = apply.getApplicantId() == null
                 ? stringValue(apply.getApplyData(), "name")
                 : nameMap.get(apply.getApplicantId());
