@@ -5,6 +5,12 @@ CREATE DATABASE IF NOT EXISTS icpc_system
     COLLATE utf8mb4_unicode_ci;
 USE icpc_system;
 
+-- 统一时区，保证脚本里的 NOW()/CURDATE() 与应用（Asia/Shanghai）一致
+SET time_zone = '+08:00';
+
+-- 显式声明连接字符集，避免 mysql 客户端默认 latin1 导致中文示例数据乱码
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+
 -- ==================== 角色与会员 ====================
 CREATE TABLE IF NOT EXISTS sys_role (
     role_code   VARCHAR(32)  NOT NULL COMMENT '角色编码',
@@ -367,3 +373,167 @@ CREATE TABLE IF NOT EXISTS operation_log (
     KEY idx_log_member (member_id),
     KEY idx_log_time (create_time)
 ) ENGINE = InnoDB COMMENT = '操作审计日志';
+
+-- ==================== 示例数据 ====================
+-- 仅用于本地开发联调；全部使用 INSERT IGNORE，可重复执行。
+-- 内置测试账号（可直接登录）：
+--   2023210100 / Admin@123456  会长
+--   2023210101 / 123456        会员
+--   2023210102 / 123456        实验室成员
+--   2023210103 / 123456        队长
+--   2023210104 / 123456        干事
+--   2023210105 / 123456        助理教练
+--   2023210106 / 123456        部长
+-- 全新初始化时管理员 member_id = 1、测试会员 = 2，下文 creator_id / leader_id 按此编写。
+
+INSERT IGNORE INTO sys_role (role_code, role_name, description) VALUES
+    ('OBSERVE_MEMBER', '观察会员', '观察会员'),
+    ('MEMBER', '会员', '正式会员'),
+    ('LAB_MEMBER', '实验室成员', '实验室成员'),
+    ('TEAM_LEADER', '队长', '队伍队长'),
+    ('OFFICER', '干事', '协会干事'),
+    ('ASSISTANT_COACH', '助理教练', '助理教练'),
+    ('MINISTER', '部长', '部门部长'),
+    ('PRESIDENT', '会长', '协会会长'),
+    ('ADVISOR', '指导老师', '指导老师');
+
+-- 测试会员账号；密码为 BCrypt 哈希，按 student_id 唯一键去重
+INSERT IGNORE INTO member (student_id, password, name, major, grade, phone, email, member_type,
+                           department, join_date, status, create_time, update_time, deleted) VALUES
+    ('2023210100', '$2a$10$iTKvA.t7c97ND6vWqyagde.gV5w4G8fgYu8NOUt4tejYPtIDS3mjK',
+     '系统管理员', '计算机科学与技术', '2023级', '13800000000', 'admin@example.com',
+     'LAB_MEMBER', '技术部', '2023-09-01', 'ACTIVE', NOW(), NOW(), 0),
+    ('2023210101', '$2a$10$J658/MW6soiM65MAWeWEKOW2R5b9qwGfSjsHzQIdVqcyH0jbsUUPa',
+     '测试会员', '计算机科学与技术', '2023级', '13800000001', 'member@example.com',
+     'MEMBER', '技术部', '2023-09-01', 'ACTIVE', NOW(), NOW(), 0),
+    ('2023210102', '$2a$10$J658/MW6soiM65MAWeWEKOW2R5b9qwGfSjsHzQIdVqcyH0jbsUUPa',
+     '张明', '软件工程', '2023级', '13800000002', 'zhangming@example.com',
+     'LAB_MEMBER', '技术部', '2023-09-01', 'ACTIVE', NOW(), NOW(), 0),
+    ('2023210103', '$2a$10$J658/MW6soiM65MAWeWEKOW2R5b9qwGfSjsHzQIdVqcyH0jbsUUPa',
+     '李华', '计算机科学与技术', '2022级', '13800000003', 'lihua@example.com',
+     'MEMBER', '竞赛部', '2022-09-01', 'ACTIVE', NOW(), NOW(), 0),
+    ('2023210104', '$2a$10$J658/MW6soiM65MAWeWEKOW2R5b9qwGfSjsHzQIdVqcyH0jbsUUPa',
+     '王芳', '信息安全', '2022级', '13800000004', 'wangfang@example.com',
+     'MEMBER', '组织部', '2022-09-01', 'ACTIVE', NOW(), NOW(), 0),
+    ('2023210105', '$2a$10$J658/MW6soiM65MAWeWEKOW2R5b9qwGfSjsHzQIdVqcyH0jbsUUPa',
+     '赵强', '计算机科学与技术', '2021级', '13800000005', 'zhaoqiang@example.com',
+     'LAB_MEMBER', '竞赛部', '2021-09-01', 'ACTIVE', NOW(), NOW(), 0),
+    ('2023210106', '$2a$10$J658/MW6soiM65MAWeWEKOW2R5b9qwGfSjsHzQIdVqcyH0jbsUUPa',
+     '孙悦', '软件工程', '2022级', '13800000006', 'sunyue@example.com',
+     'MEMBER', '宣传部', '2022-09-01', 'ACTIVE', NOW(), NOW(), 0);
+
+-- 角色已由上面的 member 行创建，这里按 student_id 关联，避免依赖自增 ID
+INSERT IGNORE INTO member_role (member_id, role_code)
+SELECT member_id, 'PRESIDENT' FROM member WHERE student_id = '2023210100';
+INSERT IGNORE INTO member_role (member_id, role_code)
+SELECT member_id, 'MEMBER' FROM member WHERE student_id = '2023210101';
+INSERT IGNORE INTO member_role (member_id, role_code)
+SELECT member_id, 'LAB_MEMBER' FROM member WHERE student_id = '2023210102';
+INSERT IGNORE INTO member_role (member_id, role_code)
+SELECT member_id, 'TEAM_LEADER' FROM member WHERE student_id = '2023210103';
+INSERT IGNORE INTO member_role (member_id, role_code)
+SELECT member_id, 'OFFICER' FROM member WHERE student_id = '2023210104';
+INSERT IGNORE INTO member_role (member_id, role_code)
+SELECT member_id, 'ASSISTANT_COACH' FROM member WHERE student_id = '2023210105';
+INSERT IGNORE INTO member_role (member_id, role_code)
+SELECT member_id, 'MINISTER' FROM member WHERE student_id = '2023210106';
+
+INSERT IGNORE INTO tag (tag_id, name, category, parent_id, sort_order, create_time, update_time, deleted) VALUES
+    (1, '动态规划', 'DP', NULL, 1, NOW(), NOW(), 0),
+    (2, '最短路', '图论', NULL, 2, NOW(), NOW(), 0),
+    (3, '素数筛', '数论', NULL, 3, NOW(), NOW(), 0),
+    (4, '贪心', '基础算法', NULL, 4, NOW(), NOW(), 0),
+    (5, '二分答案', '基础算法', NULL, 5, NOW(), NOW(), 0),
+    (6, '字符串哈希', '字符串', NULL, 6, NOW(), NOW(), 0);
+
+INSERT IGNORE INTO problem (problem_id, title, oj_problem_id, difficulty, time_limit, memory_limit,
+                            description, input_format, output_format, sample_input, sample_output, hint,
+                            visibility, creator_id, create_time, update_time, deleted) VALUES
+    (1, 'A+B Problem', '1001', 'EASY', 1000, 262144,
+     '输入两个整数，输出它们的和。', '两个整数 a 和 b', '一个整数，表示 a + b', '1 2', '3',
+     '注意数据范围与负数。', 'PUBLIC', 1, NOW(), NOW(), 0),
+    (2, '单源最短路', '1002', 'MEDIUM', 2000, 262144,
+     '给定带权有向图，求源点到所有点的最短距离。', '第一行 n m s，随后 m 行 u v w',
+     'n 个整数，表示最短距离，不可达输出 -1', '4 5 1\n1 2 2\n1 3 5\n2 3 1\n2 4 4\n3 4 1',
+     '0 2 3 4', '注意重边与自环。', 'PUBLIC', 1, NOW(), NOW(), 0),
+    (3, '最大子段和', '1003', 'MEDIUM', 1000, 262144,
+     '给定长度为 n 的整数序列，求最大连续子段和。', '第一行 n，第二行 n 个整数',
+     '一个整数，表示最大子段和', '5\n-2 1 -3 4 -1', '4', '子段不能为空。', 'PUBLIC', 1, NOW(), NOW(), 0),
+    (4, '区间求和', '1004', 'EASY', 1000, 262144,
+     '给定序列，多次查询区间和。', '第一行 n q，第二行 n 个整数，随后 q 行 l r',
+     '每个查询输出一行区间和', '5 2\n1 2 3 4 5\n1 3\n2 5', '6\n14', '使用前缀和。', 'PUBLIC', 1, NOW(), NOW(), 0);
+
+INSERT IGNORE INTO problem_tag (id, problem_id, tag_id) VALUES
+    (1, 1, 4),
+    (2, 2, 2),
+    (3, 3, 1),
+    (4, 4, 5);
+
+INSERT IGNORE INTO solution (solution_id, problem_id, content, reference_code, create_time, update_time, deleted) VALUES
+    (1, 1, '直接读入两个整数并输出它们的和。', 'int main(){int a,b;scanf("%d%d",&a,&b);printf("%d",a+b);return 0;}',
+     NOW(), NOW(), 0);
+
+INSERT IGNORE INTO training (training_id, name, type, description, start_time, end_time,
+                             leaderboard_visible, freeze_time, status, creator_id,
+                             create_time, update_time, deleted) VALUES
+    (1, '2026 秋季算法训练（一）', 'SOLO', '基础算法与数据结构专项训练',
+     DATE_SUB(NOW(), INTERVAL 3 DAY), DATE_ADD(NOW(), INTERVAL 4 DAY), 1, 0, 'PUBLISHED', 1,
+     NOW(), NOW(), 0),
+    (2, '2026 秋季算法训练（二）', 'TEAM', '图论与动态规划综合训练',
+     DATE_ADD(NOW(), INTERVAL 7 DAY), DATE_ADD(NOW(), INTERVAL 10 DAY), 1, 60, 'DRAFT', 1,
+     NOW(), NOW(), 0);
+
+INSERT IGNORE INTO team (team_id, name, leader_id, contest_target, description, status,
+                         create_time, update_time, deleted) VALUES
+    (1, 'SCUEC Alpha', 2, '2026 XCPC 校内选拔赛', '示例队伍', 'CONFIRMED', NOW(), NOW(), 0);
+
+INSERT IGNORE INTO team_member (id, team_id, member_id, join_time) VALUES
+    (1, 1, 2, NOW());
+
+INSERT IGNORE INTO camp (camp_id, type, name, start_time, end_time, location, registration_deadline,
+                         description, requirements, status, creator_id, create_time, update_time, deleted) VALUES
+    (1, 'WINTER', '2026 寒假集训', DATE_ADD(NOW(), INTERVAL 14 DAY), DATE_ADD(NOW(), INTERVAL 21 DAY),
+     '计算机学院 301', DATE_ADD(NOW(), INTERVAL 10 DAY), '寒假算法集训', '协会正式成员',
+     'ANNOUNCED', 1, NOW(), NOW(), 0);
+
+INSERT IGNORE INTO camp_task (task_id, camp_id, title, content, task_date, creator_id,
+                              create_time, update_time, deleted) VALUES
+    (1, 1, '第 1 天：基础算法', '完成指定题目并提交', DATE_ADD(CURDATE(), INTERVAL 14 DAY), 1, NOW(), NOW(), 0),
+    (2, 1, '第 2 天：动态规划', '完成 DP 入门题', DATE_ADD(CURDATE(), INTERVAL 15 DAY), 1, NOW(), NOW(), 0);
+
+INSERT IGNORE INTO contest (contest_id, name, category, start_time, end_time, registration_deadline,
+                            description, requirements, max_team_size, freeze_minutes, status, creator_id,
+                            create_time, update_time, deleted) VALUES
+    (1, '2026 新生程序设计校赛', 'SCHOLASTIC',
+     DATE_ADD(NOW(), INTERVAL 7 DAY), DATE_ADD(DATE_ADD(NOW(), INTERVAL 7 DAY), INTERVAL 5 HOUR),
+     DATE_ADD(NOW(), INTERVAL 5 DAY), '面向新生的个人赛', '在校学生', 1, 0, 'ANNOUNCED',
+     1, NOW(), NOW(), 0),
+    (2, '2026 XCPC 校内选拔赛', 'XCPC',
+     DATE_SUB(NOW(), INTERVAL 2 HOUR), DATE_ADD(NOW(), INTERVAL 2 HOUR),
+     DATE_SUB(NOW(), INTERVAL 1 DAY), 'XCPC 赛制队伍赛，封榜 60 分钟', '每队 3 人', 3, 60, 'ANNOUNCED',
+     1, NOW(), NOW(), 0),
+    (3, '2025 非 XCPC 程序设计竞赛', 'NON_XCPC',
+     DATE_SUB(NOW(), INTERVAL 10 DAY), DATE_ADD(DATE_SUB(NOW(), INTERVAL 10 DAY), INTERVAL 5 HOUR),
+     DATE_SUB(NOW(), INTERVAL 15 DAY), '非 XCPC 赛制个人赛', '协会成员', 1, 0, 'ANNOUNCED',
+     1, NOW(), NOW(), 0);
+
+INSERT IGNORE INTO contest_result (result_id, contest_id, team_id, member_id, rank_no, solved_count,
+                                   penalty, score, award, remark, create_time, update_time, deleted) VALUES
+    (1, 3, 1, NULL, 1, 6, 720, NULL, '一等奖', '示例成绩', NOW(), NOW(), 0);
+
+INSERT IGNORE INTO problem_link (id, target_type, target_id, problem_id, sort_order) VALUES
+    (1, 'TRAINING', 1, 1, 0),
+    (2, 'TRAINING', 1, 2, 1),
+    (3, 'TRAINING', 2, 3, 0),
+    (4, 'TRAINING', 2, 4, 1),
+    (5, 'CAMP_TASK', 1, 1, 0),
+    (6, 'CAMP_TASK', 1, 2, 1),
+    (7, 'CAMP_TASK', 2, 3, 0),
+    (8, 'CONTEST', 1, 1, 0),
+    (9, 'CONTEST', 1, 2, 1),
+    (10, 'CONTEST', 1, 3, 2),
+    (11, 'CONTEST', 1, 4, 3),
+    (12, 'CONTEST', 2, 1, 0),
+    (13, 'CONTEST', 2, 2, 1),
+    (14, 'CONTEST', 3, 3, 0),
+    (15, 'CONTEST', 3, 4, 1);
