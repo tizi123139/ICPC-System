@@ -1,6 +1,7 @@
 spring:
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
+    # 使用本机 3306 实例，tizi1234 已由 root 授权 icpc_system 库
     url: ${DB_URL:jdbc:mysql://localhost:3306/icpc_system?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
     username: ${DB_USERNAME:tizi1234}
     password: ${DB_PASSWORD:Tizi6666}
