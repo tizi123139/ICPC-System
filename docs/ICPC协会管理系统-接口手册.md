@@ -428,6 +428,143 @@
 
 ---
 
+## 12 奖惩管理
+
+### 12.1 奖励记录
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/rewards` | 分页查询奖励记录 | 本人 / `OFFICER`+ |
+| POST | `/rewards` | 新增奖励记录 | `OFFICER`+ |
+| GET | `/rewards/{rewardId}` | 奖励记录详情 | 本人 / `OFFICER`+ |
+| PUT | `/rewards/{rewardId}` | 修改奖励记录 | `OFFICER`+ |
+| DELETE | `/rewards/{rewardId}` | 删除奖励记录 | `OFFICER`+ |
+
+**新增奖励请求体**：
+
+```json
+{
+  "memberId": 5,
+  "title": "2026 校赛一等奖",
+  "category": "COMPETITION",
+  "level": "SCHOOL",
+  "amount": 500,
+  "description": "校赛个人赛第一名",
+  "grantDate": "2026-11-01",
+  "issuerName": "ICPC 协会"
+}
+```
+
+### 12.2 处分记录
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/punishments` | 分页查询处分记录 | 本人 / `OFFICER`+ |
+| POST | `/punishments` | 新增处分记录 | `OFFICER`+ |
+| GET | `/punishments/{punishmentId}` | 处分记录详情 | 本人 / `OFFICER`+ |
+| PUT | `/punishments/{punishmentId}` | 修改处分记录 | `OFFICER`+ |
+| DELETE | `/punishments/{punishmentId}` | 删除处分记录 | `OFFICER`+ |
+
+**新增处分请求体**：
+
+```json
+{
+  "memberId": 8,
+  "type": "WARNING",
+  "reason": "连续两次无故缺席集训",
+  "description": "经提醒仍未改正",
+  "effectiveDate": "2026-11-10",
+  "expireDate": "2027-02-10",
+  "issuerName": "ICPC 协会组织部"
+}
+```
+
+---
+
+## 13 考核管理
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/assessments` | 分页查询考核 | 已登录（普通会员仅见已发布） |
+| POST | `/assessments` | 创建考核 | `ASSISTANT_COACH`+ |
+| GET | `/assessments/{assessmentId}` | 考核详情 | 已登录 |
+| PUT | `/assessments/{assessmentId}` | 修改考核（仅 DRAFT） | `ASSISTANT_COACH`+ |
+| DELETE | `/assessments/{assessmentId}` | 删除考核 | `ASSISTANT_COACH`+ |
+| POST | `/assessments/{assessmentId}/publish` | 发布考核 | `ASSISTANT_COACH`+ |
+| GET | `/assessments/{assessmentId}/results` | 查询考核结果 | 本人 / `ASSISTANT_COACH`+ |
+| PUT | `/assessments/{assessmentId}/results` | 批量录入 / 更新考核成绩 | `ASSISTANT_COACH`+ |
+| POST | `/assessments/{assessmentId}/results/{resultId}/audit` | 审核考核结果 | `MINISTER`+ |
+| GET | `/members/{memberId}/assessments` | 查询会员考核记录 | 本人 / `ASSISTANT_COACH`+ |
+
+**创建考核请求体**：
+
+```json
+{
+  "name": "2026 春季观察期考核",
+  "type": "OBSERVATION",
+  "description": "面向 2026 级观察会员",
+  "startTime": "2026-11-20T09:00:00",
+  "endTime": "2026-12-05T18:00:00",
+  "passScore": 60
+}
+```
+
+**批量录入成绩请求体**：
+
+```json
+{
+  "results": [
+    { "memberId": 8, "score": 82, "remark": "表现良好" },
+    { "memberId": 9, "score": 58, "remark": "需加强算法基础" }
+  ]
+}
+```
+
+**审核请求体**：
+
+```json
+{
+  "status": "APPROVED",
+  "auditRemark": "成绩无误"
+}
+```
+
+---
+
+## 14 系统管理
+
+| 方法 | 路径 | 说明 | 权限 |
+|------|------|------|------|
+| GET | `/system/logs` | 分页查询操作日志 | `PRESIDENT` / `ADVISOR` |
+| GET | `/system/logs/{logId}` | 操作日志详情 | `PRESIDENT` / `ADVISOR` |
+| GET | `/system/roles` | 查询角色字典 | `PRESIDENT` / `ADVISOR` |
+| PUT | `/system/members/{memberId}/roles` | 调整会员角色 | `PRESIDENT` / `ADVISOR` |
+| GET | `/system/configs` | 查询系统配置 | `PRESIDENT` / `ADVISOR` |
+| PUT | `/system/configs` | 批量更新系统配置 | `PRESIDENT` / `ADVISOR` |
+| GET | `/system/files` | 分页查询文件记录 | `PRESIDENT` / `ADVISOR` |
+| DELETE | `/system/files/{fileId}` | 删除文件记录 | `PRESIDENT` / `ADVISOR` |
+
+**调整角色请求体**：
+
+```json
+{
+  "roles": ["MEMBER", "TEAM_LEADER"]
+}
+```
+
+**更新配置请求体**：
+
+```json
+{
+  "configs": [
+    { "configKey": "member.maxCount", "configValue": "200" },
+    { "configKey": "camp.registerDeadlineDays", "configValue": "7" }
+  ]
+}
+```
+
+---
+
 ## 附录 A 接口清单汇总（按模块）
 
 | 模块 | 接口数量 | 高优先级 | 中优先级 | 低优先级 |
@@ -443,7 +580,10 @@
 | 个性化推荐 | 2 | 0 | 0 | 2 |
 | 统计与导出 | 4 | 1 | 2 | 1 |
 | 文件上传 | 1 | 1 | 0 | 0 |
-| **合计** | **~73** | **~68** | **~12** | **~9** |
+| 奖惩管理 | 10 | 0 | 10 | 0 |
+| 考核管理 | 10 | 0 | 10 | 0 |
+| 系统管理 | 8 | 0 | 8 | 0 |
+| **合计** | **~101** | **~68** | **~40** | **~9** |
 
 ## 附录 B 错误码速查
 

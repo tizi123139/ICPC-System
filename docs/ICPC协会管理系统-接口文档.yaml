@@ -478,6 +478,296 @@ components:
           type: string
           format: date-time
 
+    RewardRecord:
+      type: object
+      properties:
+        rewardId: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        studentId: { type: string }
+        title:
+          type: string
+          description: 奖励名称，如“2026 校赛一等奖”
+        category:
+          type: string
+          enum: [COMPETITION, ACADEMIC, SERVICE, OTHER]
+          description: 竞赛获奖 / 学业表现 / 协会服务 / 其他
+        level:
+          type: string
+          enum: [SCHOOL, PROVINCIAL, NATIONAL, INTERNATIONAL, OTHER]
+          description: 校级 / 省级 / 国家级 / 国际级 / 其他
+        amount:
+          type: number
+          nullable: true
+          description: 奖金金额（元），无奖金时为空
+        description:
+          type: string
+          nullable: true
+        grantDate:
+          type: string
+          format: date
+        issuerName:
+          type: string
+          description: 颁发单位或颁发人
+        createTime:
+          type: string
+          format: date-time
+
+    RewardPayload:
+      type: object
+      required: [memberId, title, category, grantDate]
+      properties:
+        memberId: { type: integer }
+        title: { type: string }
+        category:
+          type: string
+          enum: [COMPETITION, ACADEMIC, SERVICE, OTHER]
+        level:
+          type: string
+          enum: [SCHOOL, PROVINCIAL, NATIONAL, INTERNATIONAL, OTHER]
+        amount:
+          type: number
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        grantDate:
+          type: string
+          format: date
+        issuerName: { type: string }
+
+    PunishmentRecord:
+      type: object
+      properties:
+        punishmentId: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        studentId: { type: string }
+        type:
+          type: string
+          enum: [WARNING, DEMERIT, SUSPENSION, REMOVAL]
+          description: 警告 / 记过 / 暂停会员权利 / 除名
+        reason:
+          type: string
+          description: 处分原因
+        description:
+          type: string
+          nullable: true
+        effectiveDate:
+          type: string
+          format: date
+        expireDate:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [ACTIVE, EXPIRED, REVOKED]
+          description: 生效中 / 已到期 / 已撤销
+        issuerName: { type: string }
+        revokeReason:
+          type: string
+          nullable: true
+        createTime:
+          type: string
+          format: date-time
+
+    PunishmentPayload:
+      type: object
+      required: [memberId, type, reason, effectiveDate]
+      properties:
+        memberId: { type: integer }
+        type:
+          type: string
+          enum: [WARNING, DEMERIT, SUSPENSION, REMOVAL]
+        reason: { type: string }
+        description:
+          type: string
+          nullable: true
+        effectiveDate:
+          type: string
+          format: date
+        expireDate:
+          type: string
+          format: date
+          nullable: true
+        issuerName: { type: string }
+
+    AssessmentInfo:
+      type: object
+      properties:
+        assessmentId: { type: integer }
+        name:
+          type: string
+          description: 考核名称，如“2026 春季观察期考核”
+        type:
+          type: string
+          enum: [OBSERVATION, REGULAR, CAMP, OTHER]
+          description: 观察期考核 / 转正考核 / 集训考核 / 其他
+        description:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        passScore:
+          type: integer
+          description: 合格分数线
+        status:
+          type: string
+          enum: [DRAFT, PUBLISHED, ONGOING, ENDED]
+        creator:
+          $ref: '#/components/schemas/UserInfo'
+        createTime:
+          type: string
+          format: date-time
+
+    AssessmentPayload:
+      type: object
+      required: [name, type, startTime, endTime, passScore]
+      properties:
+        name: { type: string }
+        type:
+          type: string
+          enum: [OBSERVATION, REGULAR, CAMP, OTHER]
+        description:
+          type: string
+          nullable: true
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        passScore: { type: integer }
+
+    AssessmentResult:
+      type: object
+      properties:
+        resultId: { type: integer }
+        assessmentId: { type: integer }
+        memberId: { type: integer }
+        memberName: { type: string }
+        studentId: { type: string }
+        score:
+          type: number
+          description: 考核得分
+        rank:
+          type: integer
+          nullable: true
+        passed:
+          type: boolean
+          description: 是否达到合格分数线
+        remark:
+          type: string
+          nullable: true
+        auditStatus:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED]
+          description: 待审核 / 已通过 / 已驳回
+        auditorId:
+          type: integer
+          nullable: true
+        auditRemark:
+          type: string
+          nullable: true
+        submitTime:
+          type: string
+          format: date-time
+        auditTime:
+          type: string
+          format: date-time
+          nullable: true
+
+    AssessmentResultItem:
+      type: object
+      required: [memberId]
+      properties:
+        memberId: { type: integer }
+        score: { type: number }
+        remark:
+          type: string
+          nullable: true
+
+    AssessmentResultPayload:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssessmentResultItem'
+
+    OperationLog:
+      type: object
+      properties:
+        logId: { type: integer }
+        memberId:
+          type: integer
+          nullable: true
+        username:
+          type: string
+          description: 操作人姓名，匿名操作时为空
+        method:
+          type: string
+          description: HTTP 方法
+        path:
+          type: string
+          description: 请求路径
+        action:
+          type: string
+          description: 业务动作，如“新增题目”“审核集训报名”
+        ip:
+          type: string
+        status:
+          type: integer
+          description: HTTP 状态码
+        duration:
+          type: integer
+          description: 请求耗时（毫秒）
+        createTime:
+          type: string
+          format: date-time
+
+    RoleInfo:
+      type: object
+      properties:
+        roleCode:
+          type: string
+          description: 角色编码，R01 ~ R09 对应的枚举值
+        roleName: { type: string }
+        description:
+          type: string
+          nullable: true
+
+    SystemConfig:
+      type: object
+      properties:
+        configKey: { type: string }
+        configValue: { type: string }
+        description:
+          type: string
+          nullable: true
+        updateTime:
+          type: string
+          format: date-time
+
+    FileInfo:
+      type: object
+      properties:
+        fileId: { type: integer }
+        filename: { type: string }
+        url: { type: string }
+        size: { type: integer }
+        contentType: { type: string }
+        uploaderId: { type: integer }
+        createTime:
+          type: string
+          format: date-time
+
 paths:
   # ==================== 认证模块 ====================
   /auth/login:
@@ -715,10 +1005,12 @@ paths:
                             items: { type: object }
                           rewards:
                             type: array
-                            items: { type: object }
+                            items:
+                              $ref: '#/components/schemas/RewardRecord'
                           punishments:
                             type: array
-                            items: { type: object }
+                            items:
+                              $ref: '#/components/schemas/PunishmentRecord'
 
   /members/apply/join:
     post:
@@ -2474,3 +2766,716 @@ paths:
                           url: { type: string }
                           filename: { type: string }
                           size: { type: integer }
+
+  # ==================== 奖惩管理 ====================
+  /rewards:
+    get:
+      summary: 分页查询奖励记录（本人 / OFFICER+）
+      description: 普通会员只能查询本人奖励记录；干事及以上可查询全体会员。
+      tags: [rewards, 奖惩管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+        - name: memberId
+          in: query
+          schema: { type: integer }
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [COMPETITION, ACADEMIC, SERVICE, OTHER]
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [SCHOOL, PROVINCIAL, NATIONAL, INTERNATIONAL, OTHER]
+        - name: startDate
+          in: query
+          schema: { type: string, format: date }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: 奖励记录分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          page: { type: integer }
+                          size: { type: integer }
+                          records:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/RewardRecord'
+    post:
+      summary: 新增奖励记录（OFFICER+）
+      tags: [rewards, 奖惩管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RewardPayload'
+      responses:
+        '200':
+          description: 新增成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RewardRecord'
+
+  /rewards/{rewardId}:
+    get:
+      summary: 奖励记录详情（本人 / OFFICER+）
+      tags: [rewards, 奖惩管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: rewardId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 奖励记录详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/RewardRecord'
+    put:
+      summary: 修改奖励记录（OFFICER+）
+      tags: [rewards, 奖惩管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: rewardId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RewardPayload'
+      responses:
+        '200':
+          description: 修改成功
+    delete:
+      summary: 删除奖励记录（OFFICER+）
+      tags: [rewards, 奖惩管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: rewardId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 删除成功
+
+  /punishments:
+    get:
+      summary: 分页查询处分记录（本人 / OFFICER+）
+      description: 普通会员只能查询本人处分记录；干事及以上可查询全体会员。
+      tags: [punishments, 奖惩管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+        - name: memberId
+          in: query
+          schema: { type: integer }
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [WARNING, DEMERIT, SUSPENSION, REMOVAL]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, EXPIRED, REVOKED]
+        - name: startDate
+          in: query
+          schema: { type: string, format: date }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: 处分记录分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          page: { type: integer }
+                          size: { type: integer }
+                          records:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PunishmentRecord'
+    post:
+      summary: 新增处分记录（OFFICER+）
+      tags: [punishments, 奖惩管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PunishmentPayload'
+      responses:
+        '200':
+          description: 新增成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PunishmentRecord'
+
+  /punishments/{punishmentId}:
+    get:
+      summary: 处分记录详情（本人 / OFFICER+）
+      tags: [punishments, 奖惩管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: punishmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 处分记录详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PunishmentRecord'
+    put:
+      summary: 修改处分记录（OFFICER+）
+      tags: [punishments, 奖惩管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: punishmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PunishmentPayload'
+      responses:
+        '200':
+          description: 修改成功
+    delete:
+      summary: 删除处分记录（OFFICER+）
+      tags: [punishments, 奖惩管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: punishmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 删除成功
+
+  # ==================== 考核管理 ====================
+  /assessments:
+    get:
+      summary: 分页查询考核（已登录）
+      description: 普通会员只能看到已发布的考核；助理教练及以上可查看全部。
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [OBSERVATION, REGULAR, CAMP, OTHER]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, PUBLISHED, ONGOING, ENDED]
+      responses:
+        '200':
+          description: 考核分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          page: { type: integer }
+                          size: { type: integer }
+                          records:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/AssessmentInfo'
+    post:
+      summary: 创建考核（ASSISTANT_COACH+）
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentPayload'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssessmentInfo'
+
+  /assessments/{assessmentId}:
+    get:
+      summary: 考核详情（已登录）
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 考核详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/AssessmentInfo'
+    put:
+      summary: 修改考核（ASSISTANT_COACH+，仅 DRAFT）
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentPayload'
+      responses:
+        '200':
+          description: 修改成功
+    delete:
+      summary: 删除考核（ASSISTANT_COACH+）
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 删除成功
+
+  /assessments/{assessmentId}/publish:
+    post:
+      summary: 发布考核（ASSISTANT_COACH+）
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 发布成功
+
+  /assessments/{assessmentId}/results:
+    get:
+      summary: 查询考核结果（本人 / ASSISTANT_COACH+）
+      description: 普通会员只能查看本人的考核结果。
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 考核结果列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AssessmentResult'
+    put:
+      summary: 批量录入 / 更新考核成绩（ASSISTANT_COACH+）
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentResultPayload'
+      responses:
+        '200':
+          description: 保存成功
+
+  /assessments/{assessmentId}/results/{resultId}/audit:
+    post:
+      summary: 审核考核结果（MINISTER+）
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: assessmentId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: resultId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [APPROVED, REJECTED]
+                auditRemark:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: 审核完成
+
+  /members/{memberId}/assessments:
+    get:
+      summary: 查询会员考核记录（本人 / ASSISTANT_COACH+）
+      tags: [assessments, 考核管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 会员考核记录列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AssessmentResult'
+
+  # ==================== 系统管理 ====================
+  /system/logs:
+    get:
+      summary: 分页查询操作日志（PRESIDENT / ADVISOR）
+      tags: [system, 系统管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+        - name: memberId
+          in: query
+          schema: { type: integer }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: startDate
+          in: query
+          schema: { type: string, format: date }
+        - name: endDate
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: 操作日志分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          page: { type: integer }
+                          size: { type: integer }
+                          records:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/OperationLog'
+
+  /system/logs/{logId}:
+    get:
+      summary: 操作日志详情（PRESIDENT / ADVISOR）
+      tags: [system, 系统管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: logId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 操作日志详情
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/OperationLog'
+
+  /system/roles:
+    get:
+      summary: 查询角色字典（PRESIDENT / ADVISOR）
+      tags: [system, 系统管理]
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          description: 角色列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/RoleInfo'
+
+  /system/members/{memberId}/roles:
+    put:
+      summary: 调整会员角色（PRESIDENT / ADVISOR）
+      tags: [system, 系统管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: memberId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles]
+              properties:
+                roles:
+                  type: array
+                  items:
+                    type: string
+                    enum: [OBSERVE_MEMBER, MEMBER, LAB_MEMBER, TEAM_LEADER, OFFICER, ASSISTANT_COACH, MINISTER, PRESIDENT, ADVISOR]
+      responses:
+        '200':
+          description: 调整成功
+
+  /system/configs:
+    get:
+      summary: 查询系统配置（PRESIDENT / ADVISOR）
+      tags: [system, 系统管理]
+      security: [bearerAuth: []]
+      responses:
+        '200':
+          description: 系统配置列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/SystemConfig'
+    put:
+      summary: 批量更新系统配置（PRESIDENT / ADVISOR）
+      tags: [system, 系统管理]
+      security: [bearerAuth: []]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [configs]
+              properties:
+                configs:
+                  type: array
+                  items:
+                    type: object
+                    required: [configKey, configValue]
+                    properties:
+                      configKey: { type: string }
+                      configValue: { type: string }
+      responses:
+        '200':
+          description: 更新成功
+
+  /system/files:
+    get:
+      summary: 分页查询文件记录（PRESIDENT / ADVISOR）
+      tags: [system, 系统管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 10 }
+        - name: keyword
+          in: query
+          schema: { type: string }
+        - name: uploaderId
+          in: query
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 文件记录分页结果
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          total: { type: integer }
+                          page: { type: integer }
+                          size: { type: integer }
+                          records:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/FileInfo'
+
+  /system/files/{fileId}:
+    delete:
+      summary: 删除文件记录（PRESIDENT / ADVISOR）
+      tags: [system, 系统管理]
+      security: [bearerAuth: []]
+      parameters:
+        - name: fileId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 删除成功
