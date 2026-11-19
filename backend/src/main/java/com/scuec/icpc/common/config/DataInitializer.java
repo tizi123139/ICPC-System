@@ -1,28 +1,21 @@
 package com.scuec.icpc.common.config;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.scuec.icpc.common.constant.Roles;
-import com.scuec.icpc.module.member.entity.Member;
-import com.scuec.icpc.module.member.entity.MemberRole;
 import com.scuec.icpc.module.member.entity.Role;
 import com.scuec.icpc.module.mbti.entity.MbtiQuestion;
 import com.scuec.icpc.module.mbti.mapper.MbtiQuestionMapper;
-import com.scuec.icpc.module.member.mapper.MemberMapper;
-import com.scuec.icpc.module.member.mapper.MemberRoleMapper;
 import com.scuec.icpc.module.member.mapper.RoleMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-
 /**
- * 开发环境初始化：写入角色字典与两个测试账号。
+ * 开发环境初始化：写入角色字典与 MBTI 题目。
+ * 演示账号（学号 1001~1009，密码 123456）由 db/data.sql 导入。
  * 生产环境通过 app.init-data=false 关闭。
  */
 @Slf4j
@@ -32,19 +25,14 @@ import java.time.LocalDate;
 public class DataInitializer implements ApplicationRunner {
 
     private final RoleMapper roleMapper;
-    private final MemberMapper memberMapper;
-    private final MemberRoleMapper memberRoleMapper;
     private final MbtiQuestionMapper mbtiQuestionMapper;
-    private final PasswordEncoder passwordEncoder;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
         initRoles();
-        initMember("2023210100", "Admin@123456", "系统管理员", Roles.PRESIDENT);
-        initMember("2023210101", "123456", "测试会员", Roles.MEMBER);
         initMbtiQuestions();
-        log.info("初始化数据完成。管理员账号：2023210100 / Admin@123456，测试会员：2023210101 / 123456");
+        log.info("初始化数据完成（角色字典与 MBTI 题目）。演示账号见 db/data.sql");
     }
 
     private void initRoles() {
@@ -57,30 +45,6 @@ public class DataInitializer implements ApplicationRunner {
                 roleMapper.insert(role);
             }
         }
-    }
-
-    private void initMember(String studentId, String rawPassword, String name, String roleCode) {
-        Long count = memberMapper.selectCount(Wrappers.<Member>lambdaQuery()
-                .eq(Member::getStudentId, studentId));
-        if (count != null && count > 0) {
-            return;
-        }
-        Member member = new Member();
-        member.setStudentId(studentId);
-        member.setPassword(passwordEncoder.encode(rawPassword));
-        member.setName(name);
-        member.setMajor("计算机科学与技术");
-        member.setGrade("2023级");
-        member.setMemberType(roleCode.equals(Roles.MEMBER) ? "MEMBER" : "LAB_MEMBER");
-        member.setDepartment("技术部");
-        member.setJoinDate(LocalDate.now());
-        member.setStatus("ACTIVE");
-        memberMapper.insert(member);
-
-        MemberRole memberRole = new MemberRole();
-        memberRole.setMemberId(member.getMemberId());
-        memberRole.setRoleCode(roleCode);
-        memberRoleMapper.insert(memberRole);
     }
 
     private void initMbtiQuestions() {

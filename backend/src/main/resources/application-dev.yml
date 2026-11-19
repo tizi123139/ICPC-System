@@ -10,6 +10,12 @@ spring:
       minimum-idle: 5
       connection-timeout: 30000
       idle-timeout: 600000
+  # 启动时自动导入演示数据（与前端 mock 一致）；脚本使用 INSERT IGNORE，可重复执行
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+      data-locations: classpath:db/data.sql
 
 logging:
   level:

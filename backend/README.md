@@ -83,17 +83,26 @@ mvn spring-boot:run
 
 ### 4. 测试账号
 
-| 学号 | 密码 | 角色 |
+演示账号由 `src/main/resources/db/data.sql` 导入，密码统一为 `123456`。
+
+| 学号 | 姓名 | 角色 |
 |------|------|------|
-| `2023210100` | `Admin@123456` | `PRESIDENT`（拥有全部权限） |
-| `2023210101` | `123456` | `MEMBER`（普通会员） |
+| `1001` | 陈昊 | `PRESIDENT`（拥有全部权限） |
+| `1002` | 李知远 | `MINISTER` |
+| `1003` | 林可欣 | `OFFICER` |
+| `1004` | 周雨桐 | `ASSISTANT_COACH` |
+| `1005` | 黄启帆 | `TEAM_LEADER` |
+| `1006` | 徐清越 | `LAB_MEMBER` |
+| `1007` | 赵子轩 | `MEMBER` |
+| `1008` | 王一鸣 | `OBSERVE_MEMBER` |
+| `1009` | 顾明 | `ADVISOR` |
 
 登录示例：
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"studentId":"2023210100","password":"Admin@123456"}'
+  -d '{"studentId":"1001","password":"123456"}'
 ```
 
 后续请求携带 `Authorization: Bearer <token>`。

@@ -374,7 +374,10 @@ CREATE TABLE IF NOT EXISTS operation_log (
     KEY idx_log_time (create_time)
 ) ENGINE = InnoDB COMMENT = '操作审计日志';
 
--- ==================== 示例数据 ====================
+-- ==================== 示例数据（已迁移至 db/data.sql） ====================
+-- 演示数据统一由 db/data.sql 在 dev 启动时自动导入（与前端 mock 一致）。
+-- 下面旧版示例数据整体注释保留，避免与 data.sql 冲突。
+/*
 -- 仅用于本地开发联调；全部使用 INSERT IGNORE，可重复执行。
 -- 内置测试账号（可直接登录）：
 --   2023210100 / Admin@123456  会长
@@ -537,3 +540,4 @@ INSERT IGNORE INTO problem_link (id, target_type, target_id, problem_id, sort_or
     (13, 'CONTEST', 2, 2, 1),
     (14, 'CONTEST', 3, 3, 0),
     (15, 'CONTEST', 3, 4, 1);
+*/

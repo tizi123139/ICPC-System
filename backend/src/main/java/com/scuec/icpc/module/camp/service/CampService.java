@@ -217,6 +217,25 @@ public class CampService {
                 .toList();
     }
 
+    /**
+     * 查询当前登录人在该集训的报名记录（用于判断报名状态与签到资格）。
+     */
+    public CampDtos.RegistrationVO myRegistration(Long campId) {
+        getOrThrow(campId);
+        Long memberId = SecurityUtils.currentMemberId();
+        Application registration = applicationMapper.selectOne(
+                Wrappers.<Application>lambdaQuery()
+                        .eq(Application::getType, Enums.ApplyType.CAMP_REGISTER.name())
+                        .eq(Application::getTargetId, campId)
+                        .eq(Application::getApplicantId, memberId)
+                        .orderByDesc(Application::getApplyId)
+                        .last("LIMIT 1"));
+        if (registration == null) {
+            return null;
+        }
+        return toRegistrationVO(registration, loadMembers(List.of(memberId)));
+    }
+
     @Transactional
     public void audit(Long campId, Long applyId, CampDtos.AuditRequest request) {
         getOrThrow(campId);

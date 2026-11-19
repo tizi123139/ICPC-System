@@ -71,6 +71,12 @@ public class CampController {
         return ApiResponse.ok(campService.registrations(campId, query));
     }
 
+    @Operation(summary = "查询当前登录人的集训报名记录")
+    @GetMapping("/{campId}/registrations/mine")
+    public ApiResponse<CampDtos.RegistrationVO> myRegistration(@PathVariable Long campId) {
+        return ApiResponse.ok(campService.myRegistration(campId));
+    }
+
     @Operation(summary = "审核集训报名")
     @PreAuthorize("hasRole('ASSISTANT_COACH')")
     @AuditLog("审核集训报名")

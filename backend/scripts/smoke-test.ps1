@@ -32,11 +32,11 @@ function ExpectStatus($name, $expected, $scriptBlock) {
 }
 
 Write-Host "===== 1. AUTH ====="
-$r = Call 'POST' '/auth/login' $null '{"studentId":"2023210100","password":"Admin@123456"}'
+$r = Call 'POST' '/auth/login' $null '{"studentId":"1001","password":"123456"}'
 $admin = $r.data.token
 Check 'admin login' ($r.code -eq 0 -and $admin) $r.message
 
-$r = Call 'POST' '/auth/login' $null '{"studentId":"2023210101","password":"123456"}'
+$r = Call 'POST' '/auth/login' $null '{"studentId":"1007","password":"123456"}'
 $member = $r.data.token
 Check 'member login' ($r.code -eq 0 -and $member) $r.message
 

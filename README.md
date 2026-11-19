@@ -27,6 +27,6 @@ mvn spring-boot:run
 
 - API 基础路径：`http://localhost:8080/api/v1`
 - Swagger UI：`http://localhost:8080/swagger-ui.html`
-- 管理员账号：`2023210100 / Admin@123456`
+- 演示账号：`1001 / 123456`（会长，拥有全部权限），其余账号见 `backend/src/main/resources/db/data.sql`
 
 详细说明见 [backend/README.md](backend/README.md)。

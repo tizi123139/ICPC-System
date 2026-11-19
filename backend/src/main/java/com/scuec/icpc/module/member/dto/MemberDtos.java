@@ -109,11 +109,12 @@ public final class MemberDtos {
         @Size(max = 50, message = "姓名长度不能超过 50")
         private String name;
 
-        @NotBlank(message = "专业不能为空")
+        /**
+         * 专业 / 年级：公开入会申请表单未采集，允许为空。
+         */
         @Size(max = 100, message = "专业长度不能超过 100")
         private String major;
 
-        @NotBlank(message = "年级不能为空")
         @Size(max = 20, message = "年级长度不能超过 20")
         private String grade;
 

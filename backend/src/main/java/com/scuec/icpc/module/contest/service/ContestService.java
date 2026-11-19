@@ -263,6 +263,30 @@ public class ContestService {
                 .toList();
     }
 
+    /**
+     * 查询当前登录人在该赛事的报名记录（用于判断报名状态与提交资格）。
+     */
+    public ContestDtos.RegistrationVO myRegistration(Long contestId) {
+        getOrThrow(contestId);
+        Long memberId = SecurityUtils.currentMemberId();
+        Application registration = applicationMapper.selectOne(
+                Wrappers.<Application>lambdaQuery()
+                        .eq(Application::getType, Enums.ApplyType.CONTEST_REGISTER.name())
+                        .eq(Application::getTargetId, contestId)
+                        .eq(Application::getApplicantId, memberId)
+                        .orderByDesc(Application::getApplyId)
+                        .last("LIMIT 1"));
+        if (registration == null) {
+            return null;
+        }
+        List<Long> memberIds = new ArrayList<>(List.of(memberId));
+        List<Long> teamIds = new ArrayList<>();
+        if (registration.getTeamId() != null) {
+            teamIds.add(registration.getTeamId());
+        }
+        return toRegistrationVO(registration, loadMembers(memberIds), loadTeams(teamIds));
+    }
+
     @Transactional
     public void audit(Long contestId, Long applyId, ContestDtos.AuditRequest request) {
         getOrThrow(contestId);

@@ -7,7 +7,8 @@
 --   1) 命令行：mysql -uroot -p < init-database.sql
 --   2) Navicat：连接 root → 新建查询 → 粘贴本文件内容 → 运行
 --
--- 执行完成后再用 tizi1234 账号导入 schema.sql 建立业务表。
+-- 执行完成后再用 tizi1234 账号导入 schema.sql 建立业务表；
+-- 演示数据（会员/题库/训练/集训/赛事等）由应用以 dev profile 启动时自动执行 db/data.sql 导入。
 
 CREATE DATABASE IF NOT EXISTS icpc_system
     DEFAULT CHARACTER SET utf8mb4

@@ -64,6 +64,13 @@ public class ContestController {
         return ApiResponse.ok(contestService.registrations(contestId, query));
     }
 
+    @Operation(summary = "查询当前登录人的赛事报名记录")
+    @GetMapping("/{contestId}/registrations/mine")
+    public ApiResponse<ContestDtos.RegistrationVO> myRegistration(
+            @PathVariable Long contestId) {
+        return ApiResponse.ok(contestService.myRegistration(contestId));
+    }
+
     @Operation(summary = "个人/队伍报名赛事")
     @AuditLog("报名赛事")
     @PostMapping("/{contestId}/register")
