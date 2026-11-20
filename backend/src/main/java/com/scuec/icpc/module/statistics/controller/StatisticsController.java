@@ -35,8 +35,8 @@ public class StatisticsController {
         return ApiResponse.ok(statisticsService.membersOverview());
     }
 
-    @Operation(summary = "训练数据汇总（教练/管理员）")
-    @PreAuthorize("hasRole('ASSISTANT_COACH')")
+    @Operation(summary = "训练数据汇总（干事及以上）")
+    @PreAuthorize("hasRole('OFFICER')")
     @GetMapping("/training/summary")
     public ApiResponse<StatisticsDtos.TrainingSummaryVO> trainingSummary(
             @RequestParam(required = false)

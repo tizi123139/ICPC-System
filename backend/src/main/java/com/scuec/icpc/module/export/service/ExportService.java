@@ -10,7 +10,9 @@ import com.scuec.icpc.module.export.dto.ExportDtos;
 import com.scuec.icpc.module.member.entity.Member;
 import com.scuec.icpc.module.member.mapper.MemberMapper;
 import com.scuec.icpc.module.team.entity.Team;
+import com.scuec.icpc.module.team.entity.TeamMember;
 import com.scuec.icpc.module.team.mapper.TeamMapper;
+import com.scuec.icpc.module.team.mapper.TeamMemberMapper;
 import com.scuec.icpc.module.training.dto.TrainingDtos;
 import com.scuec.icpc.module.training.entity.Training;
 import com.scuec.icpc.module.training.mapper.TrainingMapper;
@@ -51,6 +53,7 @@ public class ExportService {
     private final ContestMapper contestMapper;
     private final ContestResultMapper contestResultMapper;
     private final TeamMapper teamMapper;
+    private final TeamMemberMapper teamMemberMapper;
     private final MemberMapper memberMapper;
 
     /**
@@ -100,9 +103,10 @@ public class ExportService {
     }
 
     /**
-     * 赛事证书打包：每个获奖记录生成一个文本证书，后续可替换为 PDF 模板。
+     * 赛事证书打包：会长/副会长导出全部，其他会员只导出本人的证书。
+     * 每个获奖记录生成一个文本证书，后续可替换为 PDF 模板。
      */
-    public ExportDtos.ExportFile contestCertificates(Long contestId) {
+    public ExportDtos.ExportFile contestCertificates(Long contestId, Long requesterId, boolean includeAll) {
         Contest contest = contestMapper.selectById(contestId);
         if (contest == null) {
             throw BusinessException.notFound("赛事不存在");
@@ -114,6 +118,19 @@ public class ExportService {
                         .orderByAsc(ContestResult::getResultId));
         if (results.isEmpty()) {
             throw BusinessException.notFound("该赛事暂无成绩记录，无法生成证书");
+        }
+        if (!includeAll) {
+            Set<Long> myTeamIds = teamMemberMapper.selectList(
+                            Wrappers.<TeamMember>lambdaQuery()
+                                    .eq(TeamMember::getMemberId, requesterId))
+                    .stream().map(TeamMember::getTeamId).collect(Collectors.toSet());
+            results = results.stream()
+                    .filter(result -> requesterId.equals(result.getMemberId())
+                            || (result.getTeamId() != null && myTeamIds.contains(result.getTeamId())))
+                    .toList();
+            if (results.isEmpty()) {
+                throw BusinessException.notFound("你没有该赛事的获奖证书");
+            }
         }
 
         Set<Long> teamIds = results.stream().map(ContestResult::getTeamId)

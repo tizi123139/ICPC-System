@@ -135,6 +135,9 @@ public class CampService {
 
     @Transactional
     public void register(Long campId, CampDtos.RegistrationRequest request) {
+        // 权限表：集训报名仅观察会员、正式会员、队长，干事及以上不参与。
+        SecurityUtils.requireAnyExactRole("仅观察会员、正式会员或队长可报名集训",
+                Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.TEAM_LEADER);
         Camp camp = getOrThrow(campId);
         Long memberId = SecurityUtils.currentMemberId();
         Member member = memberMapper.selectById(memberId);
@@ -290,6 +293,9 @@ public class CampService {
 
     @Transactional
     public CampDtos.AttendanceVO checkin(Long campId, CampDtos.CheckInRequest request) {
+        // 权限表：集训签到仅观察会员、正式会员、队长，干事及以上不参与。
+        SecurityUtils.requireAnyExactRole("仅观察会员、正式会员或队长可集训签到",
+                Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.TEAM_LEADER);
         Camp camp = getOrThrow(campId);
         Long memberId = SecurityUtils.currentMemberId();
         Member member = memberMapper.selectById(memberId);

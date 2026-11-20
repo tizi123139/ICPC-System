@@ -108,7 +108,8 @@ public class ContestController {
     }
 
     @Operation(summary = "按奖项批量生成证书")
-    @PreAuthorize("hasRole('ASSISTANT_COACH')")
+    // 权限表：证书仅会长/副会长（指导老师不在此列，需显式排除继承权限）
+    @PreAuthorize("hasRole('PRESIDENT') and !hasRole('ADVISOR')")
     @AuditLog("生成赛事证书")
     @PostMapping("/{contestId}/certificates")
     public ApiResponse<ContestDtos.CertificateVO> certificates(

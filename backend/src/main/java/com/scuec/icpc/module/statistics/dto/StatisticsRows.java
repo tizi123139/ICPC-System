@@ -35,4 +35,14 @@ public final class StatisticsRows {
         private Integer acCount;
         private Integer submitCount;
     }
+
+    /**
+     * 按日聚合的提交趋势：date 为 yyyy-MM-dd。
+     */
+    @Data
+    public static class TrendRow {
+        private String date;
+        private Long submissions;
+        private Long ac;
+    }
 }

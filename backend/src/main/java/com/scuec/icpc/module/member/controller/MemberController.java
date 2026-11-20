@@ -3,6 +3,8 @@ package com.scuec.icpc.module.member.controller;
 import com.scuec.icpc.common.api.ApiResponse;
 import com.scuec.icpc.common.api.PageResult;
 import com.scuec.icpc.common.log.AuditLog;
+import com.scuec.icpc.module.assessment.dto.AssessmentDtos;
+import com.scuec.icpc.module.assessment.service.AssessmentService;
 import com.scuec.icpc.module.member.dto.MemberDtos;
 import com.scuec.icpc.module.member.service.MemberService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,6 +35,7 @@ import java.util.List;
 public class MemberController {
 
     private final MemberService memberService;
+    private final AssessmentService assessmentService;
 
     @Operation(summary = "分页查询会员列表")
     @GetMapping
@@ -77,6 +80,12 @@ public class MemberController {
         return ApiResponse.ok(memberService.archive(memberId));
     }
 
+    @Operation(summary = "查询会员考核记录")
+    @GetMapping("/{memberId}/assessments")
+    public ApiResponse<List<AssessmentDtos.ResultVO>> assessments(@PathVariable Long memberId) {
+        return ApiResponse.ok(assessmentService.memberResults(memberId));
+    }
+
     @Operation(summary = "提交入会申请")
     @PostMapping("/apply/join")
     public ApiResponse<Void> applyJoin(@Valid @RequestBody MemberDtos.ApplyJoinRequest request) {
@@ -93,14 +102,14 @@ public class MemberController {
     }
 
     @Operation(summary = "查询待审批申请列表")
-    @PreAuthorize("hasRole('OFFICER')")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/approvals")
     public ApiResponse<List<MemberDtos.ApplyVO>> approvals(@Valid MemberDtos.ApplyQuery query) {
         return ApiResponse.ok(memberService.listApprovals(query));
     }
 
     @Operation(summary = "审批入会/退会申请")
-    @PreAuthorize("hasRole('OFFICER')")
+    @PreAuthorize("isAuthenticated()")
     @AuditLog("审批会员申请")
     @PostMapping("/approvals/{applyId}/audit")
     public ApiResponse<Void> audit(@PathVariable Long applyId,

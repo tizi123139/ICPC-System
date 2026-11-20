@@ -137,6 +137,9 @@ public class ContestService {
 
     @Transactional
     public void register(Long contestId, ContestDtos.RegisterRequest request) {
+        // 权限表：校赛/XCPC 报名仅正式会员、队长，观察会员与干事及以上不参与。
+        SecurityUtils.requireAnyExactRole("仅正式会员或队长可报名赛事",
+                Roles.MEMBER, Roles.TEAM_LEADER);
         Contest contest = getOrThrow(contestId);
         Long memberId = SecurityUtils.currentMemberId();
         Member member = memberMapper.selectById(memberId);
@@ -318,6 +321,9 @@ public class ContestService {
 
     @Transactional
     public ContestDtos.SubmitVO submit(Long contestId, ContestDtos.SubmitRequest request) {
+        // 权限表：赛事提交代码仅观察会员、正式会员、队长，干事及以上不参与。
+        SecurityUtils.requireAnyExactRole("仅观察会员、正式会员或队长可提交赛事代码",
+                Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.TEAM_LEADER);
         Contest contest = getOrThrow(contestId);
         LocalDateTime now = LocalDateTime.now();
         if (contest.getStartTime() == null || contest.getEndTime() == null

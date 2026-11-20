@@ -50,6 +50,16 @@ public final class StatisticsDtos {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
+    public static class TrendItemVO {
+        private String date;
+        private Long submissions;
+        private Long ac;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class TrainingSummaryVO {
         private Long totalTrainings;
         private Long totalSubmissions;
@@ -58,5 +68,9 @@ public final class StatisticsDtos {
          */
         private Double avgAcRate;
         private List<TopMemberVO> topMembers;
+        /**
+         * 按日提交趋势，用于首页/统计页折线图。
+         */
+        private List<TrendItemVO> trend;
     }
 }

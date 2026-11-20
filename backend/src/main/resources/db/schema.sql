@@ -374,6 +374,91 @@ CREATE TABLE IF NOT EXISTS operation_log (
     KEY idx_log_time (create_time)
 ) ENGINE = InnoDB COMMENT = '操作审计日志';
 
+-- ==================== 奖惩管理 ====================
+CREATE TABLE IF NOT EXISTS reward (
+    reward_id   BIGINT        NOT NULL AUTO_INCREMENT,
+    member_id   BIGINT        NOT NULL,
+    title       VARCHAR(255)  NOT NULL COMMENT '奖励名称',
+    category    VARCHAR(30)   NOT NULL DEFAULT 'COMPETITION' COMMENT 'COMPETITION/TRAINING/ACADEMIC/SERVICE/OTHER',
+    level       VARCHAR(30)   NOT NULL DEFAULT 'SCHOOL' COMMENT 'ASSOCIATION/SCHOOL/PROVINCIAL/NATIONAL/INTERNATIONAL',
+    amount      DECIMAL(10,2) NOT NULL DEFAULT 0 COMMENT '奖金/奖品金额',
+    description TEXT          NULL,
+    grant_date  DATE          NOT NULL COMMENT '颁发日期',
+    issuer_name VARCHAR(100)  NULL COMMENT '颁发单位',
+    creator_id  BIGINT        NULL,
+    create_time DATETIME      NULL,
+    update_time DATETIME      NULL,
+    deleted     TINYINT       NOT NULL DEFAULT 0,
+    PRIMARY KEY (reward_id),
+    KEY idx_reward_member (member_id),
+    KEY idx_reward_grant_date (grant_date)
+) ENGINE = InnoDB COMMENT = '奖励记录';
+
+CREATE TABLE IF NOT EXISTS punishment (
+    punishment_id  BIGINT       NOT NULL AUTO_INCREMENT,
+    member_id      BIGINT       NOT NULL,
+    type           VARCHAR(30)  NOT NULL DEFAULT 'WARNING' COMMENT 'WARNING/SERIOUS_WARNING/REVOCATION/EXPULSION',
+    reason         VARCHAR(500) NOT NULL COMMENT '处分事由',
+    description    TEXT         NULL,
+    effective_date DATE         NOT NULL COMMENT '生效日期',
+    expire_date    DATE         NULL COMMENT '解除日期',
+    issuer_name    VARCHAR(100) NULL COMMENT '处分单位',
+    creator_id     BIGINT       NULL,
+    create_time    DATETIME     NULL,
+    update_time    DATETIME     NULL,
+    deleted        TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (punishment_id),
+    KEY idx_punishment_member (member_id),
+    KEY idx_punishment_effective_date (effective_date)
+) ENGINE = InnoDB COMMENT = '处分记录';
+
+-- ==================== 考核管理 ====================
+CREATE TABLE IF NOT EXISTS assessment (
+    assessment_id BIGINT       NOT NULL AUTO_INCREMENT,
+    name          VARCHAR(255) NOT NULL,
+    type          VARCHAR(30)  NOT NULL DEFAULT 'OBSERVATION' COMMENT 'OBSERVATION/REGULAR/PROMOTION',
+    description   TEXT         NULL,
+    start_time    DATETIME     NULL,
+    end_time      DATETIME     NULL,
+    pass_score    INT          NOT NULL DEFAULT 60 COMMENT '通过分数线',
+    status        VARCHAR(20)  NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/PUBLISHED',
+    creator_id    BIGINT       NULL,
+    create_time   DATETIME     NULL,
+    update_time   DATETIME     NULL,
+    deleted       TINYINT      NOT NULL DEFAULT 0,
+    PRIMARY KEY (assessment_id),
+    KEY idx_assessment_status (status),
+    KEY idx_assessment_type (type)
+) ENGINE = InnoDB COMMENT = '考核';
+
+CREATE TABLE IF NOT EXISTS assessment_result (
+    result_id     BIGINT        NOT NULL AUTO_INCREMENT,
+    assessment_id BIGINT        NOT NULL,
+    member_id     BIGINT        NOT NULL,
+    score         DECIMAL(6,2)  NOT NULL DEFAULT 0,
+    remark        VARCHAR(500)  NULL,
+    audit_status  VARCHAR(20)   NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/APPROVED/REJECTED',
+    audit_remark  VARCHAR(500)  NULL,
+    auditor_id    BIGINT        NULL,
+    audit_time    DATETIME      NULL,
+    create_time   DATETIME      NULL,
+    update_time   DATETIME      NULL,
+    deleted       TINYINT       NOT NULL DEFAULT 0,
+    PRIMARY KEY (result_id),
+    UNIQUE KEY uk_assessment_result (assessment_id, member_id),
+    KEY idx_assessment_result_member (member_id),
+    KEY idx_assessment_result_audit (audit_status)
+) ENGINE = InnoDB COMMENT = '考核成绩';
+
+-- ==================== 系统配置 ====================
+CREATE TABLE IF NOT EXISTS system_config (
+    config_key   VARCHAR(100) NOT NULL COMMENT '配置项',
+    config_value VARCHAR(500) NOT NULL DEFAULT '' COMMENT '配置值',
+    description  VARCHAR(255) NULL,
+    update_time  DATETIME     NULL,
+    PRIMARY KEY (config_key)
+) ENGINE = InnoDB COMMENT = '系统配置';
+
 -- ==================== 示例数据（已迁移至 db/data.sql） ====================
 -- 演示数据统一由 db/data.sql 在 dev 启动时自动导入（与前端 mock 一致）。
 -- 下面旧版示例数据整体注释保留，避免与 data.sql 冲突。

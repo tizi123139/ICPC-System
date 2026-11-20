@@ -76,7 +76,8 @@ public class ProblemController {
     }
 
     @Operation(summary = "删除题目")
-    @PreAuthorize("hasRole('MINISTER')")
+    // 权限表：题目录入/维护（含删除）由助理教练、会长/副会长、指导老师操作
+    @PreAuthorize("hasRole('ASSISTANT_COACH')")
     @AuditLog("删除题目")
     @DeleteMapping("/{problemId}")
     public ApiResponse<Void> delete(@PathVariable Long problemId) {

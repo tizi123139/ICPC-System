@@ -79,6 +79,10 @@ public final class MbtiDtos {
          */
         private String report;
         private String reportUrl;
+        /**
+         * 发展建议，根据四字母类型生成。
+         */
+        private List<String> suggestions;
         private LocalDateTime testTime;
     }
 }

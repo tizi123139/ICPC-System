@@ -15,6 +15,10 @@ import com.scuec.icpc.module.member.entity.Member;
 import com.scuec.icpc.module.member.entity.MemberRole;
 import com.scuec.icpc.module.member.mapper.MemberMapper;
 import com.scuec.icpc.module.member.mapper.MemberRoleMapper;
+import com.scuec.icpc.module.reward.entity.Punishment;
+import com.scuec.icpc.module.reward.entity.Reward;
+import com.scuec.icpc.module.reward.mapper.PunishmentMapper;
+import com.scuec.icpc.module.reward.mapper.RewardMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -51,6 +55,8 @@ public class MemberService {
     private final MemberMapper memberMapper;
     private final ApplicationMapper applicationMapper;
     private final MemberRoleMapper memberRoleMapper;
+    private final RewardMapper rewardMapper;
+    private final PunishmentMapper punishmentMapper;
     private final PasswordEncoder passwordEncoder;
 
     // ==================== 会员信息 ====================
@@ -92,6 +98,9 @@ public class MemberService {
 
     @Transactional
     public MemberDtos.MemberVO create(MemberDtos.CreateRequest request) {
+        // 权限表：会员新增仅干事与会长/副会长。
+        SecurityUtils.requireAnyExactRole("仅干事或会长/副会长可新增会员",
+                Roles.OFFICER, Roles.PRESIDENT);
         Long exists = memberMapper.selectCount(Wrappers.<Member>lambdaQuery()
                 .eq(Member::getStudentId, request.getStudentId().trim()));
         if (exists != null && exists > 0) {
@@ -121,7 +130,7 @@ public class MemberService {
     @Transactional
     public MemberDtos.MemberVO update(Long memberId, MemberDtos.UpdateRequest request) {
         Member member = getOrThrow(memberId);
-        boolean manager = SecurityUtils.isAtLeast(Roles.OFFICER);
+        boolean manager = SecurityUtils.hasAnyExactRole(Roles.OFFICER, Roles.PRESIDENT);
         if (!manager && !SecurityUtils.isSelf(memberId)) {
             throw BusinessException.forbidden("只能修改自己的资料");
         }
@@ -171,8 +180,8 @@ public class MemberService {
     @Transactional
     public void delete(Long memberId) {
         Member member = getOrThrow(memberId);
-        if (!SecurityUtils.isAtLeast(Roles.PRESIDENT)) {
-            throw BusinessException.forbidden("仅会长及以上角色可删除会员");
+        if (!SecurityUtils.hasAnyExactRole(Roles.PRESIDENT)) {
+            throw BusinessException.forbidden("仅会长/副会长可删除会员");
         }
         if (Enums.MemberStatus.REMOVED.name().equals(member.getStatus())) {
             return;
@@ -193,9 +202,14 @@ public class MemberService {
                 .basicInfo(basicInfo)
                 .trainingRecords(memberMapper.selectTrainingRecords(memberId))
                 .contestRecords(memberMapper.selectContestRecords(memberId))
-                // 奖惩表尚未在 M1 数据库设计中落地，先返回空列表，后续接入奖惩模块。
-                .rewards(Collections.emptyList())
-                .punishments(Collections.emptyList())
+                .rewards(rewardMapper.selectMaps(Wrappers.<Reward>lambdaQuery()
+                        .eq(Reward::getMemberId, memberId)
+                        .orderByDesc(Reward::getGrantDate)
+                        .last("LIMIT 50")))
+                .punishments(punishmentMapper.selectMaps(Wrappers.<Punishment>lambdaQuery()
+                        .eq(Punishment::getMemberId, memberId)
+                        .orderByDesc(Punishment::getEffectiveDate)
+                        .last("LIMIT 50")))
                 .build();
     }
 
@@ -235,6 +249,9 @@ public class MemberService {
 
     @Transactional
     public void applyResign(MemberDtos.ApplyResignRequest request) {
+        // 权限表：仅观察会员、正式会员、队长可提交退会申请，干事及以上不参与。
+        SecurityUtils.requireAnyExactRole("当前角色不可提交退会申请",
+                Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.TEAM_LEADER);
         Long memberId = SecurityUtils.currentMemberId();
         Member member = getOrThrow(memberId);
         if (!Enums.MemberStatus.ACTIVE.name().equals(member.getStatus())) {
@@ -261,6 +278,9 @@ public class MemberService {
     }
 
     public List<MemberDtos.ApplyVO> listApprovals(MemberDtos.ApplyQuery query) {
+        // 权限表：入会审批仅干事、会长/副会长、指导老师；助理教练不得查看审批列表。
+        SecurityUtils.requireAnyExactRole("仅干事、会长/副会长或指导老师可查看审批列表",
+                Roles.OFFICER, Roles.PRESIDENT, Roles.ADVISOR);
         LambdaQueryWrapper<Application> wrapper = Wrappers.lambdaQuery();
         if (StringUtils.hasText(query.getType())) {
             String type = parseEnum(Enums.ApplyType.class, query.getType(), "type").name();
@@ -314,14 +334,14 @@ public class MemberService {
         Enums.AuditAction action = parseEnum(Enums.AuditAction.class,
                 request.getAction(), "action");
 
-        // 入会审批由干事及以上负责，退会/除名审批由部长及以上负责。
+        // 入会审批由干事及以上负责，退会/除名审批按权限表仅会长/副会长与指导老师。
         if (Enums.ApplyType.JOIN_MEMBER.name().equals(apply.getType())) {
-            if (!SecurityUtils.isAtLeast(Roles.OFFICER)) {
-                throw BusinessException.forbidden("仅干事及以上角色可审批入会申请");
+            if (!SecurityUtils.hasAnyExactRole(Roles.OFFICER, Roles.PRESIDENT, Roles.ADVISOR)) {
+                throw BusinessException.forbidden("仅干事、会长/副会长或指导老师可审批入会申请");
             }
         } else if (Enums.ApplyType.RESIGN.name().equals(apply.getType())) {
-            if (!SecurityUtils.isAtLeast(Roles.MINISTER)) {
-                throw BusinessException.forbidden("仅部长及以上角色可审批退会申请");
+            if (!SecurityUtils.isAtLeast(Roles.PRESIDENT)) {
+                throw BusinessException.forbidden("仅会长/副会长或指导老师可审批退会申请");
             }
         } else {
             throw BusinessException.badRequest("暂不支持该类型的申请审批");

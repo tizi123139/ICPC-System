@@ -224,6 +224,9 @@ public class TrainingService {
 
     @Transactional
     public TrainingDtos.SubmissionVO submit(Long trainingId, TrainingDtos.SubmitRequest request) {
+        // 权限表：训练提交代码仅观察会员、正式会员、队长，干事及以上不参与。
+        SecurityUtils.requireAnyExactRole("仅观察会员、正式会员或队长可提交训练代码",
+                Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.TEAM_LEADER);
         Training training = getOrThrow(trainingId);
         LocalDateTime now = LocalDateTime.now();
         if (!Enums.TrainingStatus.ONGOING.name()
@@ -425,7 +428,15 @@ public class TrainingService {
     }
 
     public TrainingDtos.AbilityVO ability(Long memberId) {
-        SecurityUtils.requireSelfOrAtLeast(memberId, Roles.ASSISTANT_COACH);
+        // 权限表：能力评估仅观察会员、正式会员、队长、助理教练、会长/副会长；
+        // 干事与指导老师不参与，助理教练与会长可查看他人。
+        boolean manager = SecurityUtils.hasAnyExactRole(
+                Roles.ASSISTANT_COACH, Roles.PRESIDENT);
+        boolean participant = SecurityUtils.hasAnyExactRole(Roles.OBSERVE_MEMBER,
+                Roles.MEMBER, Roles.TEAM_LEADER, Roles.ASSISTANT_COACH, Roles.PRESIDENT);
+        if (!manager && !(participant && SecurityUtils.isSelf(memberId))) {
+            throw BusinessException.forbidden("当前角色不可查看能力评估");
+        }
         Member member = memberMapper.selectById(memberId);
         if (member == null) {
             throw BusinessException.notFound("会员不存在");

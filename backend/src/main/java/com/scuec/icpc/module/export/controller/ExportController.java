@@ -1,5 +1,7 @@
 package com.scuec.icpc.module.export.controller;
 
+import com.scuec.icpc.common.constant.Roles;
+import com.scuec.icpc.common.security.SecurityUtils;
 import com.scuec.icpc.module.export.dto.ExportDtos;
 import com.scuec.icpc.module.export.service.ExportService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * 数据导出接口，路径与《接口文档》/export 保持一致。
@@ -38,11 +41,14 @@ public class ExportController {
         return toResponse(exportService.trainingReport(trainingId));
     }
 
-    @Operation(summary = "下载赛事获奖证书打包（ZIP）")
-    @PreAuthorize("hasRole('ASSISTANT_COACH')")
+    @Operation(summary = "下载赛事获奖证书（本人证书 / 会长打包全部）")
     @GetMapping("/contest-certificates/{contestId}")
     public ResponseEntity<byte[]> contestCertificates(@PathVariable Long contestId) {
-        return toResponse(exportService.contestCertificates(contestId));
+        // 权限表：证书下载允许本人；批量打包全部证书仅会长/副会长（指导老师不包括）。
+        List<String> roles = SecurityUtils.currentRoles();
+        boolean all = roles.contains(Roles.PRESIDENT) && !roles.contains(Roles.ADVISOR);
+        return toResponse(exportService.contestCertificates(
+                contestId, SecurityUtils.currentMemberId(), all));
     }
 
     /**

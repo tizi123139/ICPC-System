@@ -52,6 +52,26 @@ public final class SecurityUtils {
     }
 
     /**
+     * 精确匹配角色，不使用角色层级继承。
+     * 用于权限表明确列出角色、且不应把更高角色自动带入的场景。
+     */
+    public static boolean hasAnyExactRole(String... roles) {
+        List<String> assigned = currentRoles();
+        for (String role : roles) {
+            if (assigned.contains(role)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static void requireAnyExactRole(String message, String... roles) {
+        if (!hasAnyExactRole(roles)) {
+            throw BusinessException.forbidden(message);
+        }
+    }
+
+    /**
      * 本人或达到指定角色才允许访问。
      */
     public static void requireSelfOrAtLeast(Long memberId, String role) {

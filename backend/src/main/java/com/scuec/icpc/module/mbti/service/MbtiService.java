@@ -49,6 +49,10 @@ public class MbtiService {
     // ==================== 题目 ====================
 
     public List<MbtiDtos.QuestionVO> questions() {
+        // 权限表：MBTI 仅观察会员、正式会员、队长、助理教练、会长/副会长参与。
+        SecurityUtils.requireAnyExactRole("当前角色不参与 MBTI 测评",
+                Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.TEAM_LEADER,
+                Roles.ASSISTANT_COACH, Roles.PRESIDENT);
         return questionMapper.selectList(Wrappers.<MbtiQuestion>lambdaQuery()
                         .orderByAsc(MbtiQuestion::getQuestionNo)
                         .orderByAsc(MbtiQuestion::getQuestionId))
@@ -80,6 +84,9 @@ public class MbtiService {
 
     @Transactional
     public MbtiDtos.ResultVO submit(MbtiDtos.SubmitRequest request) {
+        SecurityUtils.requireAnyExactRole("当前角色不参与 MBTI 测评",
+                Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.TEAM_LEADER,
+                Roles.ASSISTANT_COACH, Roles.PRESIDENT);
         Long memberId = SecurityUtils.currentMemberId();
         List<MbtiQuestion> all = questionMapper.selectList(null);
         if (all.isEmpty()) {
@@ -140,6 +147,9 @@ public class MbtiService {
     }
 
     public MbtiDtos.ResultVO latest(Long memberId) {
+        SecurityUtils.requireAnyExactRole("当前角色不参与 MBTI 测评",
+                Roles.OBSERVE_MEMBER, Roles.MEMBER, Roles.TEAM_LEADER,
+                Roles.ASSISTANT_COACH, Roles.PRESIDENT);
         SecurityUtils.requireSelfOrAtLeast(memberId, Roles.ASSISTANT_COACH);
         MbtiResult result = resultMapper.selectOne(Wrappers.<MbtiResult>lambdaQuery()
                 .eq(MbtiResult::getMemberId, memberId)
@@ -162,8 +172,35 @@ public class MbtiService {
                 .scores(scores)
                 .report(result.getReport())
                 .reportUrl(null)
+                .suggestions(suggestionsFor(result.getType()))
                 .testTime(result.getTestTime())
                 .build();
+    }
+
+    /**
+     * 根据 MBTI 四字母类型生成发展建议，保证结果页“发展建议”始终有内容。
+     */
+    private List<String> suggestionsFor(String type) {
+        if (type == null || type.length() != 4) {
+            return List.of();
+        }
+        char energy = type.charAt(0);
+        char perception = type.charAt(1);
+        char decision = type.charAt(2);
+        char lifestyle = type.charAt(3);
+        return List.of(
+                energy == 'E'
+                        ? "多参与团队讨论，主动表达自己的思路，带动队伍氛围"
+                        : "保留独立思考时间，同时定期向队友同步进展，减少信息差",
+                perception == 'S'
+                        ? "继续发挥注重细节和实操的优势，同时关注整体解题节奏"
+                        : "大胆提出创新解法，同时补充可行性验证和边界测试",
+                decision == 'T'
+                        ? "决策时兼顾队友感受，注意沟通方式，避免过于直接"
+                        : "在关注团队氛围的同时，补充客观数据和复盘结论支撑决策",
+                lifestyle == 'J'
+                        ? "保持计划性的同时，为临场调整预留空间"
+                        : "发挥灵活应变的优势，同时为关键节点设置检查点");
     }
 
     // ==================== 内部工具 ====================

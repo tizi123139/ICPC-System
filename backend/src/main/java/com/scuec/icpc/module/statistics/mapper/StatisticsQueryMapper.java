@@ -107,4 +107,23 @@ public interface StatisticsQueryMapper {
     List<StatisticsRows.TopMemberRow> selectTopMembers(@Param("startDate") LocalDate startDate,
                                                        @Param("endDate") LocalDate endDate,
                                                        @Param("limit") int limit);
+
+    /**
+     * 按日聚合提交数与 AC 数，供训练提交趋势折线图使用。
+     */
+    @Select("""
+            <script>
+            SELECT DATE_FORMAT(submit_time, '%Y-%m-%d') AS date,
+                   COUNT(*) AS submissions,
+                   SUM(CASE WHEN result = 'AC' THEN 1 ELSE 0 END) AS ac
+            FROM submission
+            WHERE deleted = 0 AND submit_time IS NOT NULL
+            <if test="startDate != null">AND submit_time &gt;= #{startDate}</if>
+            <if test="endDate != null">AND submit_time &lt; DATE_ADD(#{endDate}, INTERVAL 1 DAY)</if>
+            GROUP BY DATE_FORMAT(submit_time, '%Y-%m-%d')
+            ORDER BY date
+            </script>
+            """)
+    List<StatisticsRows.TrendRow> selectSubmissionTrend(@Param("startDate") LocalDate startDate,
+                                                        @Param("endDate") LocalDate endDate);
 }

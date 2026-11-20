@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.scuec.icpc.common.api.PageResult;
+import com.scuec.icpc.common.constant.Roles;
 import com.scuec.icpc.common.enums.Enums;
 import com.scuec.icpc.common.exception.BusinessException;
 import com.scuec.icpc.common.security.SecurityUtils;
@@ -250,9 +251,13 @@ public class ProblemService {
 
     public List<ProblemDtos.SubmissionVO> submissions(Long problemId) {
         getOrThrow(problemId);
+        // 权限表：提交记录本人可见；助理教练及以上可查看全部。
+        Long callerId = SecurityUtils.currentMemberId();
+        boolean manager = SecurityUtils.isAtLeast(Roles.ASSISTANT_COACH);
         List<Submission> submissions = submissionMapper.selectList(
                 Wrappers.<Submission>lambdaQuery()
                         .eq(Submission::getProblemId, problemId)
+                        .eq(!manager, Submission::getSubmitterId, callerId)
                         .orderByDesc(Submission::getSubmitTime)
                         .orderByDesc(Submission::getSubmitId)
                         .last("LIMIT 50"));

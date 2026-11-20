@@ -63,6 +63,13 @@ public class StatisticsService {
                 .totalSubmissions(totalSubmissions)
                 .avgAcRate(avgAcRate)
                 .topMembers(topMembers)
+                .trend(queryMapper.selectSubmissionTrend(startDate, endDate).stream()
+                        .map(row -> StatisticsDtos.TrendItemVO.builder()
+                                .date(row.getDate())
+                                .submissions(row.getSubmissions() == null ? 0 : row.getSubmissions())
+                                .ac(row.getAc() == null ? 0 : row.getAc())
+                                .build())
+                        .toList())
                 .build();
     }
 

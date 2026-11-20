@@ -10,6 +10,7 @@ import com.scuec.icpc.common.exception.BusinessException;
 import com.scuec.icpc.common.security.SecurityUtils;
 import com.scuec.icpc.module.member.entity.Member;
 import com.scuec.icpc.module.member.mapper.MemberMapper;
+import com.scuec.icpc.module.member.mapper.MemberRoleMapper;
 import com.scuec.icpc.module.team.dto.TeamDtos;
 import com.scuec.icpc.module.team.dto.TeamRows;
 import com.scuec.icpc.module.team.entity.Team;
@@ -50,6 +51,7 @@ public class TeamService {
     private final TeamMemberMapper teamMemberMapper;
     private final TeamQueryMapper queryMapper;
     private final MemberMapper memberMapper;
+    private final MemberRoleMapper memberRoleMapper;
 
     // ==================== 查询 ====================
 
@@ -84,7 +86,7 @@ public class TeamService {
     @Transactional
     public Long create(TeamDtos.CreateRequest request) {
         Long leaderId = SecurityUtils.currentMemberId();
-        requireActiveMember(leaderId);
+        requireTeamEligible(leaderId);
 
         List<Long> invited = request.getInvitedMemberIds() == null
                 ? List.of()
@@ -96,7 +98,7 @@ public class TeamService {
         if (invited.size() + 1 > MAX_TEAM_SIZE) {
             throw BusinessException.badRequest("队伍最多 " + MAX_TEAM_SIZE + " 人");
         }
-        invited.forEach(this::requireActiveMember);
+        invited.forEach(this::requireTeamEligible);
 
         Team team = new Team();
         team.setName(request.getName().trim());
@@ -165,7 +167,7 @@ public class TeamService {
         if (exists != null && exists > 0) {
             throw BusinessException.conflict("该成员已在队伍中");
         }
-        requireActiveMember(memberId);
+        requireTeamEligible(memberId);
 
         addMember(teamId, memberId);
         log.info("队伍 {} 邀请成员 {}", teamId, memberId);
@@ -256,6 +258,17 @@ public class TeamService {
         }
         if (!Enums.MemberStatus.ACTIVE.name().equals(member.getStatus())) {
             throw BusinessException.conflict("会员 " + member.getName() + " 状态异常，无法加入队伍");
+        }
+    }
+
+    /**
+     * 权限表：组队仅正式会员、队长参与，观察会员和干事及以上角色不可组队。
+     */
+    private void requireTeamEligible(Long memberId) {
+        requireActiveMember(memberId);
+        List<String> roles = memberRoleMapper.selectRoleCodes(memberId);
+        if (!roles.contains(Roles.MEMBER) && !roles.contains(Roles.TEAM_LEADER)) {
+            throw BusinessException.forbidden("仅正式会员或队长可组队");
         }
     }
 

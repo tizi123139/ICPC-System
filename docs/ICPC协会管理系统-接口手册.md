@@ -64,13 +64,13 @@
 |------|------|---------|
 | `OBSERVE_MEMBER` | 观察会员 | 可提交入会申请、参加日常训练、查看公开题库 |
 | `MEMBER` | 正式会员 | 同上 + 组队、校赛/XCPC 报名 |
-| `LAB_MEMBER` | 竞赛实验室成员 | 同上 + 可看集训私有题库 |
 | `TEAM_LEADER` | 队长 | 同上 + 管理队伍成员 |
-| `OFFICER` | 干事 | 审核报名、考勤、数据统计 |
+| `OFFICER` | 干事 | 入会审批、奖惩记录、会员结构统计 |
 | `ASSISTANT_COACH` | 助理教练 | 出题、创建训练、考核、集训任务发布 |
-| `MINISTER` | 部长/副部长 | 审批申请、奖惩、考核结果 |
 | `PRESIDENT` | 会长/副会长 | 系统管理、最高审批 |
 | `ADVISOR` | 指导老师 | 只读监督 + 重大决策审批 |
+
+> 本手册权限统一按上表 7 角色口径定义：原 `MINISTER`（部长/副部长）审批类权限并入 `PRESIDENT` / `ADVISOR`，删除与证书类权限并入 `PRESIDENT`；原 `LAB_MEMBER`（竞赛实验室成员）的集训私题库访问权限并入 `MEMBER`+（观察会员不可见）。
 
 ### 0.6 业务状态枚举速查
 
@@ -136,9 +136,9 @@
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
 | GET | `/members` | 分页查询会员列表（支持多条件筛选） | 已登录 |
-| POST | `/members` | 新增会员 | `OFFICER` / `MINISTER` / `PRESIDENT` |
+| POST | `/members` | 新增会员 | `OFFICER` / `PRESIDENT` |
 | GET | `/members/{memberId}` | 获取会员详情 | 已登录 |
-| PUT | `/members/{memberId}` | 更新会员信息 | `OFFICER` / `MINISTER` / `PRESIDENT` |
+| PUT | `/members/{memberId}` | 更新会员信息 | `OFFICER` / `PRESIDENT` |
 | DELETE | `/members/{memberId}` | 逻辑删除会员 | `PRESIDENT` |
 | GET | `/members/{memberId}/archive` | 获取会员完整档案 | 本人 / `OFFICER`+ |
 
@@ -161,7 +161,7 @@
 | POST | `/members/apply/join` | 提交入会申请 | 公开（观察期前） |
 | POST | `/members/apply/resign` | 提交退会申请 | 已登录会员 |
 | GET | `/members/approvals` | 查询待审批申请列表 | `OFFICER`+ |
-| POST | `/members/approvals/{applyId}/audit` | 审批申请 | `OFFICER`+（退会除名需 `MINISTER`+） |
+| POST | `/members/approvals/{applyId}/audit` | 审批申请 | `OFFICER`+（退会 / 除名审批需 `PRESIDENT` 或 `ADVISOR`） |
 
 **审批请求体**：
 
@@ -183,7 +183,7 @@
 | GET | `/tags` | 获取知识点树（含父子层级） | 已登录 |
 | POST | `/tags` | 新增知识点 | `ASSISTANT_COACH`+ |
 | PUT | `/tags/{tagId}` | 修改知识点 | `ASSISTANT_COACH`+ |
-| DELETE | `/tags/{tagId}` | 删除知识点 | `MINISTER`+ |
+| DELETE | `/tags/{tagId}` | 删除知识点 | `PRESIDENT` |
 
 ### 3.2 题目管理
 
@@ -191,9 +191,9 @@
 |------|------|------|------|
 | GET | `/problems` | 分页查询题目（支持知识点/难度/可见范围筛选） | 已登录 |
 | POST | `/problems` | 新增题目 | `ASSISTANT_COACH`+ |
-| GET | `/problems/{problemId}` | 获取题目详情 | 已登录（集训私有题需 `LAB_MEMBER`+） |
+| GET | `/problems/{problemId}` | 获取题目详情 | 已登录（集训私有题需 `MEMBER`+，观察会员不可见） |
 | PUT | `/problems/{problemId}` | 修改题目 | `ASSISTANT_COACH`+ |
-| DELETE | `/problems/{problemId}` | 删除题目 | `MINISTER`+ |
+| DELETE | `/problems/{problemId}` | 删除题目 | `PRESIDENT` |
 | PUT | `/problems/{problemId}/solution` | 更新题解（Markdown + 参考代码） | `ASSISTANT_COACH`+ |
 | POST | `/problems/import` | 从 OJ 批量导入题目 | `ASSISTANT_COACH`+ |
 
@@ -229,7 +229,7 @@
 | POST | `/trainings` | 创建训练（单人/组队） | `ASSISTANT_COACH`+ |
 | GET | `/trainings/{trainingId}` | 获取训练详情（含题目列表） | 已登录 |
 | PUT | `/trainings/{trainingId}` | 修改训练（仅 `DRAFT` 状态） | 训练创建者 |
-| DELETE | `/trainings/{trainingId}` | 删除训练 | 训练创建者 / `MINISTER`+ |
+| DELETE | `/trainings/{trainingId}` | 删除训练 | 训练创建者 / `PRESIDENT` |
 | POST | `/trainings/{trainingId}/publish` | 发布训练 | 训练创建者 |
 
 **创建训练请求体**：
@@ -283,7 +283,7 @@
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
 | GET | `/trainings/{trainingId}/leaderboard` | 实时榜单（自动识别封榜状态） | 已登录 |
-| GET | `/trainings/ability/{userId}` | 个人能力雷达图数据 + 文字报告 | 本人 / `ASSISTANT_COACH`+ |
+| GET | `/trainings/ability/{userId}` | 个人能力雷达图数据 + 文字报告 | 本人（`OBSERVE_MEMBER` / `MEMBER` / `TEAM_LEADER` / `ASSISTANT_COACH` / `PRESIDENT`，`OFFICER` 与 `ADVISOR` 不参与能力评估）/ `ASSISTANT_COACH` / `PRESIDENT` |
 
 **榜单响应示例**：
 
@@ -356,7 +356,7 @@
 | POST | `/contests/{contestId}/registrations/{applyId}/audit` | 审核报名 | `ASSISTANT_COACH`+ |
 | GET | `/contests/{contestId}/leaderboard` | 实时榜单（自动封榜） | 已登录 |
 | POST | `/contests/{contestId}/submit` | 比赛中提交代码 | 已报名队伍成员 |
-| POST | `/contests/{contestId}/certificates` | 批量生成获奖电子证书 | `MINISTER`+ |
+| POST | `/contests/{contestId}/certificates` | 批量生成获奖电子证书 | `PRESIDENT` |
 | PUT | `/contests/{contestId}/results` | 赛后登记获奖/成绩 | `ASSISTANT_COACH`+ |
 
 **发布赛事请求体**：
@@ -379,11 +379,13 @@
 
 ## 8 MBTI 管理（低优先级）
 
+> 干事（`OFFICER`）与指导老师（`ADVISOR`）不参与 MBTI 测评，无 MBTI 相关接口权限。
+
 | 方法 | 路径 | 说明 | 权限 |
 |------|------|------|------|
-| GET | `/mbti/questions` | 获取测评题目列表 | 已登录 |
-| POST | `/mbti/submit` | 提交答案，返回测评结果 | 已登录 |
-| GET | `/mbti/results/{userId}` | 查看某会员测评结果 | 本人 / `ASSISTANT_COACH`+ |
+| GET | `/mbti/questions` | 获取测评题目列表 | `OBSERVE_MEMBER` / `MEMBER` / `TEAM_LEADER` / `ASSISTANT_COACH` / `PRESIDENT` |
+| POST | `/mbti/submit` | 提交答案，返回测评结果 | `OBSERVE_MEMBER` / `MEMBER` / `TEAM_LEADER` / `ASSISTANT_COACH` / `PRESIDENT` |
+| GET | `/mbti/results/{userId}` | 查看某会员测评结果 | 本人（同上角色）/ `ASSISTANT_COACH` / `PRESIDENT` |
 
 ---
 
@@ -403,7 +405,7 @@
 | GET | `/statistics/members/overview` | 会员结构统计（年级/专业/部门/类型） | `OFFICER`+ |
 | GET | `/statistics/training/summary` | 训练数据汇总 | `ASSISTANT_COACH`+ |
 | GET | `/export/training-report/{trainingId}` | 导出训练成绩报表（Excel） | `ASSISTANT_COACH`+ |
-| GET | `/export/contest-certificates/{contestId}` | 下载赛事获奖证书 ZIP | 本人 / `MINISTER`+ |
+| GET | `/export/contest-certificates/{contestId}` | 下载赛事获奖证书 ZIP | 本人 / `PRESIDENT` |
 
 ---
 
@@ -493,7 +495,7 @@
 | POST | `/assessments/{assessmentId}/publish` | 发布考核 | `ASSISTANT_COACH`+ |
 | GET | `/assessments/{assessmentId}/results` | 查询考核结果 | 本人 / `ASSISTANT_COACH`+ |
 | PUT | `/assessments/{assessmentId}/results` | 批量录入 / 更新考核成绩 | `ASSISTANT_COACH`+ |
-| POST | `/assessments/{assessmentId}/results/{resultId}/audit` | 审核考核结果 | `MINISTER`+ |
+| POST | `/assessments/{assessmentId}/results/{resultId}/audit` | 审核考核结果 | `PRESIDENT` / `ADVISOR` |
 | GET | `/members/{memberId}/assessments` | 查询会员考核记录 | 本人 / `ASSISTANT_COACH`+ |
 
 **创建考核请求体**：
