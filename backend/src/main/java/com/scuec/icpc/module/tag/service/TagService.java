@@ -8,12 +8,15 @@ import com.scuec.icpc.module.tag.entity.Tag;
 import com.scuec.icpc.module.tag.mapper.TagMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -36,13 +39,15 @@ public class TagService {
 
     /**
      * 一次性取出全部知识点后在内存中组树，避免逐层查询造成 N+1。
+     * 知识点变更频率低、读取频繁，整棵树上 Redis 缓存，写操作时主动失效。
      */
+    @Cacheable(cacheNames = "tagTree", key = "'all'")
     public List<TagDtos.TagVO> tree() {
         List<Tag> tags = tagMapper.selectList(Wrappers.<Tag>lambdaQuery()
                 .orderByAsc(Tag::getSortOrder)
                 .orderByAsc(Tag::getTagId));
         if (tags.isEmpty()) {
-            return List.of();
+            return new ArrayList<>();
         }
         Map<Long, List<Tag>> childrenMap = tags.stream()
                 .filter(tag -> tag.getParentId() != null)
@@ -52,14 +57,15 @@ public class TagService {
         return tags.stream()
                 .filter(tag -> tag.getParentId() == null || !allIds.contains(tag.getParentId()))
                 .map(tag -> toVO(tag, childrenMap))
-                .toList();
+                // 使用可反序列化的 ArrayList，避免 Redis 缓存写入 JDK 内部不可变集合类型
+                .collect(Collectors.toCollection(ArrayList::new));
     }
 
     private TagDtos.TagVO toVO(Tag tag, Map<Long, List<Tag>> childrenMap) {
         List<TagDtos.TagVO> children = childrenMap.getOrDefault(tag.getTagId(), List.of())
                 .stream()
                 .map(child -> toVO(child, childrenMap))
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
         return TagDtos.TagVO.builder()
                 .tagId(tag.getTagId())
                 .name(tag.getName())
@@ -73,6 +79,7 @@ public class TagService {
     // ==================== 写操作 ====================
 
     @Transactional
+    @CacheEvict(cacheNames = "tagTree", allEntries = true)
     public Long create(TagDtos.CreateRequest request) {
         Long parentId = normalizeParentId(request.getParentId());
         if (parentId != null) {
@@ -92,6 +99,7 @@ public class TagService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "tagTree", allEntries = true)
     public void update(Long tagId, TagDtos.UpdateRequest request) {
         Tag tag = getOrThrow(tagId);
         Long parentId = request.getParentId() == null
@@ -123,6 +131,7 @@ public class TagService {
     }
 
     @Transactional
+    @CacheEvict(cacheNames = "tagTree", allEntries = true)
     public void delete(Long tagId) {
         getOrThrow(tagId);
         Long children = tagMapper.selectCount(Wrappers.<Tag>lambdaQuery()

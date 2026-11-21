@@ -6,6 +6,7 @@ import com.scuec.icpc.module.statistics.dto.StatisticsRows;
 import com.scuec.icpc.module.statistics.mapper.StatisticsQueryMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -24,6 +25,7 @@ public class StatisticsService {
 
     private final StatisticsQueryMapper queryMapper;
 
+    @Cacheable(cacheNames = "statisticsMembers", key = "'overview'")
     public StatisticsDtos.MemberOverviewVO membersOverview() {
         return StatisticsDtos.MemberOverviewVO.builder()
                 .byGrade(toCountItems(queryMapper.countByGrade()))
@@ -33,6 +35,9 @@ public class StatisticsService {
                 .build();
     }
 
+    @Cacheable(cacheNames = "statisticsTraining",
+            key = "T(java.util.Objects).toString(#startDate, 'all') + ':' "
+                    + "+ T(java.util.Objects).toString(#endDate, 'all')")
     public StatisticsDtos.TrainingSummaryVO trainingSummary(LocalDate startDate, LocalDate endDate) {
         if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
             throw BusinessException.badRequest("开始日期不能晚于结束日期");
